@@ -1,0 +1,20 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot
+        run: |
+          curl -sL -o godot.zip https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          unzip -q godot.zip && mv Godot_v4.7.2-stable_linux.x86_64 /usr/local/bin/godot
+      - name: Tests
+        run: |
+          godot --headless --import --path . || true
+          godot --headless --path . --script res://tests/run_tests.gd
+      - name: Soak
+        run: YEARS=6 SEEDS=1,2,3 godot --headless --path . --script res://tests/soak.gd

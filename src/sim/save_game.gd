@@ -101,3 +101,8 @@ static func load_world(path := PATH) -> World:
 
 static func exists(path := PATH) -> bool:
 	return FileAccess.file_exists(path)
+
+
+static func delete(path := PATH) -> void:
+	if FileAccess.file_exists(path):
+		DirAccess.remove_absolute(path)

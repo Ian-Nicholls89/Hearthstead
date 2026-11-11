@@ -1,0 +1,492 @@
+class_name WorldView
+extends Node3D
+## Draws the World: terrain and water once, then trees, roads, fields, buildings
+## and people, redrawing each layer only when the sim says it changed.
+
+const GRASS_A := Color(0.3, 0.45, 0.19)
+const GRASS_B := Color(0.38, 0.5, 0.22)
+const FIELD_SOIL := Color(0.42, 0.3, 0.2)
+const ROAD := Color(0.58, 0.48, 0.34)
+const JOB_COLORS := {
+	"Labourer": Color(0.62, 0.55, 0.45), "Builder": Color(0.85, 0.6, 0.2), "Child": Color(0.6, 0.75, 0.9),
+	"Gatherer": Color(0.7, 0.25, 0.45), "Hunter": Color(0.45, 0.32, 0.2), "Fisher": Color(0.3, 0.5, 0.75),
+	"Farmer": Color(0.85, 0.75, 0.3), "Forester": Color(0.25, 0.55, 0.25), "Herbalist": Color(0.45, 0.75, 0.4),
+	"Woodcutter": Color(0.7, 0.42, 0.2), "Blacksmith": Color(0.3, 0.3, 0.35), "Tailor": Color(0.75, 0.3, 0.25),
+	"Stonecutter": Color(0.7, 0.7, 0.7), "Miner": Color(0.5, 0.35, 0.3), "Trader": Color(0.8, 0.7, 0.2),
+}
+
+var world: World
+var terrain_mat: ShaderMaterial
+var tree_mat: ShaderMaterial
+var thing_mat: ShaderMaterial
+var water_mat: StandardMaterial3D
+var trees: Array[MultiMeshInstance3D] = []
+var boulders: MultiMeshInstance3D
+var marks: MultiMeshInstance3D
+var roads: MultiMeshInstance3D
+var soil: MultiMeshInstance3D
+var crops: MultiMeshInstance3D
+var people: MultiMeshInstance3D
+var loads: MultiMeshInstance3D
+var building_nodes := {}            # id -> Node3D
+var prev_pos := {}                  # citizen id -> Vector2 at the start of the last step
+var facing := {}
+var _rev := -1
+var _brev := -1
+var _field_timer := 0.0
+var _site_timer := 0.0
+var _tile_timer := 0.0
+var selection: MeshInstance3D
+var radius_ring: MeshInstance3D
+
+
+func setup(w: World) -> void:
+	world = w
+	terrain_mat = Meshes.material().duplicate()
+	tree_mat = Meshes.material().duplicate()
+	thing_mat = Meshes.material().duplicate()
+	_build_terrain()
+	_build_water()
+	for kind in 2:
+		var mmi := _multimesh(Meshes.tree(kind), tree_mat, false)
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		trees.append(mmi)
+	boulders = _multimesh(Meshes.boulder(), thing_mat, false)
+	marks = _multimesh(Meshes.crate(), _flat_material(Color(0.9, 0.2, 0.15)), false)
+	roads = _multimesh(Meshes.flat_tile(), _flat_material(ROAD), false)
+	soil = _multimesh(Meshes.flat_tile(), _flat_material(FIELD_SOIL), false)
+	crops = _multimesh(Meshes.crop(), thing_mat, true)
+	people = _multimesh(Meshes.person(), thing_mat, true)
+	loads = _multimesh(Meshes.crate(), thing_mat, true)
+	selection = MeshInstance3D.new()
+	var sm := StandardMaterial3D.new()
+	sm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	sm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	sm.albedo_color = Color(1, 0.9, 0.3, 0.35)
+	var pm := PlaneMesh.new()
+	pm.size = Vector2.ONE
+	pm.center_offset = Vector3(0.5, 0, 0.5)
+	selection.mesh = pm
+	selection.material_override = sm
+	selection.visible = false
+	add_child(selection)
+	radius_ring = MeshInstance3D.new()
+	var rm := StandardMaterial3D.new()
+	rm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	rm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	rm.albedo_color = Color(1, 1, 1, 0.45)
+	radius_ring.material_override = rm
+	radius_ring.visible = false
+	add_child(radius_ring)
+	snapshot()
+
+
+func _flat_material(c: Color) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = c
+	m.roughness = 1.0
+	return m
+
+
+func _multimesh(mesh: Mesh, mat: Material, colors: bool) -> MultiMeshInstance3D:
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = colors
+	mm.mesh = mesh
+	var mmi := MultiMeshInstance3D.new()
+	mmi.multimesh = mm
+	mmi.material_override = mat
+	add_child(mmi)
+	return mmi
+
+
+static func tile_pos(t: Vector2i, y := 0.0) -> Vector3:
+	return Vector3(t.x + 0.5, y, t.y + 0.5)
+
+
+func _hash(i: int) -> float:
+	var h := (i * 2654435761) & 0xffffffff
+	return float(h % 10007) / 10007.0
+
+
+# --- terrain -------------------------------------------------------------------
+
+func _tile_height(x: int, y: int) -> float:
+	x = clampi(x, 0, world.width - 1)
+	y = clampi(y, 0, world.height - 1)
+	var i := y * world.width + x
+	match world.terrain[i]:
+		Defs.Terrain.WATER: return -0.5
+		Defs.Terrain.FORD: return -0.14
+		Defs.Terrain.ROCK: return 1.0 + _hash(i) * 1.6 + _rock_depth(x, y) * 0.5
+	return 0.0
+
+
+func _rock_depth(x: int, y: int) -> float:
+	var n := 0
+	for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1), Vector2i(2, 0), Vector2i(-2, 0), Vector2i(0, 2), Vector2i(0, -2)]:
+		var t: Vector2i = Vector2i(x, y) + d
+		if not world.in_bounds(t) or world.terrain[world.idx(t)] == Defs.Terrain.ROCK:
+			n += 1
+	return n
+
+
+func _corner(x: int, y: int) -> float:
+	# a corner sits as high as the lowest-lying of the flat tiles around it, so
+	# grass stays flat and only the mountains and the river bed bend
+	var hs := [_tile_height(x - 1, y - 1), _tile_height(x, y - 1), _tile_height(x - 1, y), _tile_height(x, y)]
+	var flat := true
+	for h in hs:
+		if h != 0.0:
+			flat = false
+	if flat:
+		return 0.0
+	var low: float = hs.min()
+	var high: float = hs.max()
+	if low < 0.0:
+		return low
+	return high * 0.8 if hs.has(0.0) else (hs[0] + hs[1] + hs[2] + hs[3]) / 4.0
+
+
+func _tile_color(i: int) -> Color:
+	var j := _hash(i * 7 + 3)
+	match world.terrain[i]:
+		Defs.Terrain.WATER: return Color(0.33, 0.36, 0.28)
+		Defs.Terrain.FORD: return Color(0.6, 0.56, 0.42)
+		Defs.Terrain.ROCK: return Color(0.48, 0.46, 0.43).lightened(j * 0.12)
+	match world.feature[i]:
+		Defs.Feature.STONE_DEP: return Color(0.6, 0.6, 0.58).darkened(j * 0.12)
+		Defs.Feature.IRON_DEP: return Color(0.56, 0.36, 0.28).darkened(j * 0.12)
+	var f := clampf((world.fert[i] - 0.4) / 0.85, 0.0, 1.0)
+	var c := Color(0.48, 0.48, 0.26).lerp(GRASS_A, f).lerp(GRASS_B, j * 0.5)
+	return c
+
+
+func _build_terrain() -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var w := world.width
+	var h := world.height
+	var corners := PackedFloat32Array()
+	corners.resize((w + 1) * (h + 1))
+	for y in h + 1:
+		for x in w + 1:
+			corners[y * (w + 1) + x] = _corner(x, y)
+	Meshes.facing_up(w / 2.0, h / 2.0)
+	for y in h:
+		for x in w:
+			var i := y * w + x
+			var c := _tile_color(i)
+			var a := Vector3(x, corners[y * (w + 1) + x], y)
+			var b := Vector3(x + 1, corners[y * (w + 1) + x + 1], y)
+			var cc := Vector3(x + 1, corners[(y + 1) * (w + 1) + x + 1], y + 1)
+			var d := Vector3(x, corners[(y + 1) * (w + 1) + x], y + 1)
+			Meshes._tri(st, d, cc, b, c)
+			Meshes._tri(st, d, b, a, c)
+	# skirt down the map edge so it does not look paper-thin
+	var edge := Color(0.3, 0.25, 0.2)
+	Meshes.inside = Vector3(w / 2.0, 0, h / 2.0)
+	for x in w:
+		Meshes._quad(st, Vector3(x, -2, 0), Vector3(x + 1, -2, 0), Vector3(x + 1, corners[x + 1], 0), Vector3(x, corners[x], 0), edge)
+		Meshes._quad(st, Vector3(x + 1, -2, h), Vector3(x, -2, h), Vector3(x, corners[h * (w + 1) + x], h), Vector3(x + 1, corners[h * (w + 1) + x + 1], h), edge)
+	for y in h:
+		Meshes._quad(st, Vector3(0, -2, y + 1), Vector3(0, -2, y), Vector3(0, corners[y * (w + 1)], y), Vector3(0, corners[(y + 1) * (w + 1)], y + 1), edge)
+		Meshes._quad(st, Vector3(w, -2, y), Vector3(w, -2, y + 1), Vector3(w, corners[(y + 1) * (w + 1) + w], y + 1), Vector3(w, corners[y * (w + 1) + w], y), edge)
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = terrain_mat
+	mi.name = "Terrain"
+	add_child(mi)
+
+
+func _build_water() -> void:
+	var mi := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(world.width, world.height)
+	mi.mesh = pm
+	mi.position = Vector3(world.width / 2.0, -0.08, world.height / 2.0)
+	water_mat = StandardMaterial3D.new()
+	water_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	water_mat.albedo_color = Color(0.2, 0.42, 0.58, 0.8)
+	water_mat.roughness = 0.2
+	water_mat.metallic_specular = 0.6
+	mi.material_override = water_mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
+
+
+# --- per frame --------------------------------------------------------------------
+
+## Remember where everyone is before the sim moves them, so frames can interpolate.
+func snapshot() -> void:
+	for c in world.citizens.values():
+		prev_pos[c.id] = c.pos
+
+
+func update_view(alpha: float, delta: float) -> void:
+	_tile_timer -= delta
+	if world.revision != _rev and _tile_timer <= 0.0:
+		_rev = world.revision
+		_tile_timer = 0.4
+		_draw_tiles()
+	if world.building_revision != _brev:
+		_brev = world.building_revision
+		_sync_buildings()
+	_site_timer -= delta
+	if _site_timer <= 0.0:
+		_site_timer = 0.3
+		_update_sites()
+	_field_timer -= delta
+	if _field_timer <= 0.0:
+		_field_timer = 0.5
+		_draw_fields()
+	_draw_people(alpha)
+	_season()
+
+
+func _season() -> void:
+	var t := float(world.tick % Defs.YEAR_TICKS) / Defs.MONTH_TICKS   # 0..12
+	# snow settles from Early Winter and melts through Early Spring
+	var snow := 0.0
+	if t >= 9.0:
+		snow = clampf((t - 9.0) * 1.5, 0.0, 1.0)
+	elif t < 1.0:
+		snow = clampf(1.0 - t * 1.2, 0.0, 1.0)
+	var autumn := 0.0
+	if t >= 6.0 and t < 9.5:
+		autumn = clampf((t - 6.0) / 1.5, 0.0, 1.0) * clampf((9.5 - t) * 2.0, 0.0, 1.0)
+	terrain_mat.set_shader_parameter("snow", snow * 0.9)
+	tree_mat.set_shader_parameter("snow", snow * 0.7)
+	thing_mat.set_shader_parameter("snow", snow)
+	tree_mat.set_shader_parameter("leaf_tint", Color(0.8, 0.42, 0.12, autumn * 0.55))
+	water_mat.albedo_color = Color(0.2, 0.42, 0.58, 0.8).lerp(Color(0.8, 0.88, 0.95, 0.95), snow * 0.8)
+
+
+func _draw_tiles() -> void:
+	var tree_t: Array[Array] = [[], []]
+	var boulder_t: Array[Transform3D] = []
+	var mark_t: Array[Transform3D] = []
+	var road_t: Array[Transform3D] = []
+	for i in world.feature.size():
+		var f := world.feature[i]
+		var x := i % world.width
+		var y := i / world.width
+		if world.road[i]:
+			road_t.append(Transform3D(Basis(), Vector3(x, 0.015, y)))
+		if f == Defs.Feature.TREE:
+			var h := _hash(i)
+			var s := 0.35 + world.growth[i] * 0.75 + h * 0.15
+			var b := Basis(Vector3.UP, h * TAU).scaled(Vector3(s, s * (0.9 + h * 0.3), s))
+			var p := Vector3(x + 0.3 + h * 0.4, 0, y + 0.3 + _hash(i + 1) * 0.4)
+			tree_t[0 if _hash(i + 5) < 0.6 else 1].append(Transform3D(b, p))
+			if world.mark[i]:
+				mark_t.append(Transform3D(Basis().scaled(Vector3(0.8, 0.8, 0.8)), p + Vector3(0, 1.4 * s, 0)))
+		elif f == Defs.Feature.BOULDER:
+			var h := _hash(i)
+			var b := Basis(Vector3.UP, h * TAU).scaled(Vector3.ONE * (0.8 + h * 0.5))
+			var p := Vector3(x + 0.5, 0, y + 0.5)
+			boulder_t.append(Transform3D(b, p))
+			if world.mark[i]:
+				mark_t.append(Transform3D(Basis().scaled(Vector3(0.8, 0.8, 0.8)), p + Vector3(0, 0.6, 0)))
+	for k in 2:
+		_fill(trees[k], tree_t[k])
+	_fill(boulders, boulder_t)
+	_fill(marks, mark_t)
+	_fill(roads, road_t)
+
+
+func _fill(mmi: MultiMeshInstance3D, ts: Array) -> void:
+	var mm := mmi.multimesh
+	if mm.instance_count < ts.size() or mm.instance_count > ts.size() + 256:
+		mm.instance_count = ts.size() + 64
+	mm.visible_instance_count = ts.size()
+	for i in ts.size():
+		mm.set_instance_transform(i, ts[i])
+
+
+func _draw_fields() -> void:
+	var soil_t: Array[Transform3D] = []
+	var crop_t: Array[Transform3D] = []
+	var crop_c: Array[Color] = []
+	for b in world.buildings.values():
+		if b.kind() != "field":
+			continue
+		for i in b.field.size():
+			var t := world.field_tile(b, i)
+			soil_t.append(Transform3D(Basis(), Vector3(t.x, 0.012, t.y)))
+			var g: float = b.field[i]
+			if g < 0.0:
+				continue
+			var ripe: bool = g >= 1.0
+			var col: Color
+			if b.crop == "wheat":
+				col = Color(0.45, 0.65, 0.25).lerp(Color(0.92, 0.78, 0.32), clampf((g - 0.6) / 0.4, 0, 1))
+			else:
+				col = Color(0.35, 0.6, 0.25).lerp(Color(0.25, 0.45, 0.18), clampf((g - 0.6) / 0.4, 0, 1))
+			var hgt: float = 0.05 + g * 0.4
+			crop_t.append(Transform3D(Basis().scaled(Vector3(1, hgt, 1)), Vector3(t.x, 0.0, t.y)))
+			crop_c.append(col if not ripe else col.lightened(0.1))
+	_fill(soil, soil_t)
+	_fill(crops, crop_t)
+	for i in crop_c.size():
+		crops.multimesh.set_instance_color(i, crop_c[i])
+
+
+func _draw_people(alpha: float) -> void:
+	var mm := people.multimesh
+	var n := world.citizens.size()
+	if mm.instance_count < n:
+		mm.instance_count = n + 32
+		loads.multimesh.instance_count = n + 32
+	mm.visible_instance_count = n
+	var li := 0
+	var i := 0
+	for c in world.citizens.values():
+		var a: Vector2 = prev_pos.get(c.id, c.pos)
+		var p := a.lerp(c.pos, alpha)
+		var d: Vector2 = c.pos - a
+		if d.length_squared() > 0.00001:
+			facing[c.id] = atan2(d.x, d.y)
+		var s := 1.3 if c.is_adult() else 0.9
+		var y := 0.0
+		var t: Vector2i = c.tile()
+		if world.in_bounds(t) and world.terrain[world.idx(t)] == Defs.Terrain.FORD:
+			y = -0.12
+		var basis := Basis(Vector3.UP, facing.get(c.id, 0.0)).scaled(Vector3(s, s, s))
+		mm.set_instance_transform(i, Transform3D(basis, Vector3(p.x, y, p.y)))
+		var col: Color = JOB_COLORS.get(world.job_name(c), Color.WHITE)
+		if c.sick:
+			col = col.lerp(Color(0.5, 0.8, 0.3), 0.5)
+		mm.set_instance_color(i, col)
+		if c.carrying() > 0:
+			var res: String = c.carry.keys()[0]
+			loads.multimesh.set_instance_transform(li, Transform3D(Basis().scaled(Vector3(0.9, 0.9, 0.9)), Vector3(p.x, y + 0.5 * s, p.y)))
+			loads.multimesh.set_instance_color(li, Defs.RES[res].color)
+			li += 1
+		i += 1
+	loads.multimesh.visible_instance_count = li
+
+
+# --- buildings ---------------------------------------------------------------------
+
+func _sync_buildings() -> void:
+	for id in building_nodes.keys():
+		if not world.buildings.has(id):
+			building_nodes[id].queue_free()
+			building_nodes.erase(id)
+	for b in world.buildings.values():
+		if b.kind() == "field":
+			continue
+		var node: Node3D = building_nodes.get(b.id)
+		if node == null:
+			node = Node3D.new()
+			node.position = Vector3(b.pos.x, 0, b.pos.y)
+			var mi := MeshInstance3D.new()
+			mi.name = "Body"
+			mi.mesh = Meshes.building(b.type)
+			mi.material_override = thing_mat
+			node.add_child(mi)
+			var sc := MeshInstance3D.new()
+			sc.name = "Scaffold"
+			sc.mesh = Meshes.scaffold(b.size)
+			sc.material_override = thing_mat
+			node.add_child(sc)
+			add_child(node)
+			building_nodes[b.id] = node
+	_update_sites()
+
+
+func _update_sites() -> void:
+	for id in building_nodes:
+		var b: Building = world.buildings.get(id)
+		if b == null:
+			continue
+		var node: Node3D = building_nodes[id]
+		var body: MeshInstance3D = node.get_node("Body")
+		var sc: MeshInstance3D = node.get_node("Scaffold")
+		if b.built:
+			body.scale = Vector3.ONE
+			sc.visible = false
+		else:
+			var f := clampf(b.progress / maxf(1.0, b.work), 0.0, 1.0)
+			body.scale = Vector3(1, maxf(0.03, f), 1)
+			sc.visible = true
+		_fire(node, b)
+
+
+func _fire(node: Node3D, b: Building) -> void:
+	var fire: Node3D = node.get_node_or_null("Fire")
+	if b.fire > 0 and fire == null:
+		fire = Node3D.new()
+		fire.name = "Fire"
+		var p := CPUParticles3D.new()
+		p.amount = 40
+		p.lifetime = 1.0
+		p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+		p.emission_box_extents = Vector3(b.size.x * 0.4, 0.3, b.size.y * 0.4)
+		p.direction = Vector3.UP
+		p.spread = 15
+		p.gravity = Vector3(0, 1.5, 0)
+		p.initial_velocity_min = 0.5
+		p.initial_velocity_max = 1.2
+		p.scale_amount_min = 0.15
+		p.scale_amount_max = 0.35
+		var pm := BoxMesh.new()
+		pm.size = Vector3(0.3, 0.3, 0.3)
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.albedo_color = Color(1.0, 0.5, 0.1)
+		m.vertex_color_use_as_albedo = true
+		pm.material = m
+		p.mesh = pm
+		var grad := Gradient.new()
+		grad.set_color(0, Color(1.0, 0.85, 0.3))
+		grad.set_color(1, Color(0.3, 0.3, 0.3, 0.0))
+		p.color_ramp = grad
+		p.position = Vector3(b.size.x / 2.0, 0.6, b.size.y / 2.0)
+		fire.add_child(p)
+		var light := OmniLight3D.new()
+		light.light_color = Color(1.0, 0.6, 0.25)
+		light.light_energy = 2.0
+		light.omni_range = 5.0
+		light.position = p.position + Vector3(0, 0.8, 0)
+		fire.add_child(light)
+		node.add_child(fire)
+	elif b.fire <= 0 and fire != null:
+		fire.queue_free()
+
+
+# --- selection and radius ---------------------------------------------------------------
+
+func show_selection(b: Building) -> void:
+	if b == null:
+		selection.visible = false
+		radius_ring.visible = false
+		return
+	selection.visible = true
+	selection.position = Vector3(b.pos.x, 0.03, b.pos.y)
+	selection.scale = Vector3(b.size.x, 1, b.size.y)
+	show_radius(b.center(), float(b.def().get("radius", 0)))
+
+
+func show_radius(center: Vector2, r: float) -> void:
+	if r <= 0:
+		radius_ring.visible = false
+		return
+	radius_ring.visible = true
+	radius_ring.mesh = _ring(r)
+	radius_ring.position = Vector3(center.x, 0.05, center.y)
+
+
+func _ring(r: float) -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	Meshes.facing_up()
+	var n := 64
+	for i in n:
+		var a0 := TAU * i / n
+		var a1 := TAU * (i + 1) / n
+		var o0 := Vector3(cos(a0), 0, sin(a0))
+		var o1 := Vector3(cos(a1), 0, sin(a1))
+		Meshes._quad(st, o0 * (r - 0.12), o1 * (r - 0.12), o1 * (r + 0.12), o0 * (r + 0.12), Color.WHITE)
+	return st.commit()

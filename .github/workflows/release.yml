@@ -1,0 +1,47 @@
+name: Release
+# Tag vX.Y.Z to build a signed APK and publish it as a GitHub release.
+# Secrets: HS_GAME_KEYSTORE_BASE64, HS_GAME_KEYSTORE_PASSWORD, HS_GAME_KEY_ALIAS
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Install Godot and Android templates
+        run: |
+          V=4.7.2
+          curl -sL -o godot.zip https://github.com/godotengine/godot/releases/download/${V}-stable/Godot_v${V}-stable_linux.x86_64.zip
+          unzip -q godot.zip && mv Godot_v${V}-stable_linux.x86_64 /usr/local/bin/godot
+          curl -sL -o t.tpz https://github.com/godotengine/godot/releases/download/${V}-stable/Godot_v${V}-stable_export_templates.tpz
+          D=~/.local/share/godot/export_templates/${V}.stable
+          mkdir -p $D && unzip -qj t.tpz 'templates/android_*' 'templates/version.txt' -d $D && rm t.tpz
+          mkdir -p ~/.config/godot
+          printf '[gd_resource type="EditorSettings" format=3]\n\n[resource]\nexport/android/android_sdk_path = "%s"\nexport/android/java_sdk_path = "%s"\n' "$ANDROID_SDK_ROOT" "$JAVA_HOME" > ~/.config/godot/editor_settings-4.7.tres
+      - name: Test
+        run: |
+          godot --headless --import --path . || true
+          godot --headless --path . --script res://tests/run_tests.gd
+      - name: Build signed APK
+        env:
+          KS: ${{ secrets.HS_GAME_KEYSTORE_BASE64 }}
+          GODOT_ANDROID_KEYSTORE_RELEASE_USER: ${{ secrets.HS_GAME_KEY_ALIAS }}
+          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: ${{ secrets.HS_GAME_KEYSTORE_PASSWORD }}
+        run: |
+          test -n "$KS" || { echo "Release key secrets are missing"; exit 1; }
+          echo "$KS" | base64 -d > $RUNNER_TEMP/release.jks
+          export GODOT_ANDROID_KEYSTORE_RELEASE_PATH=$RUNNER_TEMP/release.jks
+          mkdir -p build
+          godot --headless --path . --export-release "Android" build/hearthstead.apk
+          mv build/hearthstead.apk build/hearthstead-${GITHUB_REF_NAME}.apk
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: build/hearthstead-*.apk
+          generate_release_notes: true
