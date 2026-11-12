@@ -11,4 +11,6 @@ YEARS=${YEARS:-6} SEEDS=${SEEDS:-1,2,3} timeout 900 $G --headless --path . --scr
 if [ -n "${DISPLAY:-}" ] || pgrep Xvfb >/dev/null; then
   echo "== touch input"
   DISPLAY=${DISPLAY:-:77} timeout 300 $G --path . --resolution 1280x720 --script res://tests/input_test.gd 2>&1 | grep -E '^ok|FAIL|PASSED|SCRIPT ERROR'
+  echo "== new era rebuilds the town"
+  DISPLAY=${DISPLAY:-:77} timeout 300 $G --path . --resolution 640x360 --script res://tests/era_view.gd 2>&1 | grep -E '^era|SCRIPT ERROR'
 fi
