@@ -460,3 +460,50 @@ func test_bread_milestone_counts() -> void:
 	w.made["bread"] = 640
 	var m: Array = w.milestones().filter(func(x): return x.text == "bread baked")
 	check(m.size() == 1 and m[0].have == 640 and m[0].need == 1000, "bread milestone %s" % str(m))
+
+
+# --- large town ----------------------------------------------------------------------
+
+func test_glassworks_and_university() -> void:
+	var w := world(1)
+	var cb := camp(w)
+	w.place("glassworks", AutoPlay.find_spot(w, "glassworks"), true)
+	w.run(Defs.MONTH_TICKS * 2)
+	check(w.made.get("glass", 0) > 20, "glass made (%d)" % w.made.get("glass", 0))
+	var a := world(2)
+	var b := world(2)
+	b.place("university", AutoPlay.find_spot(b, "university"), true)
+	a.run(Defs.MONTH_TICKS * 3)
+	b.run(Defs.MONTH_TICKS * 3)
+	check(b.knowledge > a.knowledge + 25, "scholars added knowledge (%.0f vs %.0f)" % [b.knowledge, a.knowledge])
+
+
+func test_large_town_rules() -> void:
+	var w := world(1)
+	var id := w.place("barn", AutoPlay.find_spot(w, "barn"), true)
+	var cap: int = w.buildings[id].capacity()
+	w._learn("granaries")
+	check(w.buildings[id].capacity() == int(cap * 1.5), "granaries: barns hold more (%d -> %d)" % [cap, w.buildings[id].capacity()])
+	var cost := w.tech_cost("theatre")
+	w._learn("printing")
+	check(is_equal_approx(w.tech_cost("theatre"), cost * 0.8), "printing: techs cheaper")
+	w._learn("guilds")
+	check(is_equal_approx(w.mod("workshop"), 0.75), "guilds: workshops faster")
+
+
+func test_trade_counts_and_banking() -> void:
+	var w := world(1)
+	w.merchant = {"goods": {"tools": 20}, "until": w.tick + 800, "post": -1}
+	check(not w.trade({"logs": 30}, {"tools": 5}), "60 worth of logs won't buy 70 worth of tools")
+	w._learn("banking")
+	check(w.trade({"logs": 30}, {"tools": 5}), "with banking it will")
+	check(w.traded == 60, "traded value counted (%d)" % w.traded)
+
+
+func test_harbour_needs_water_and_fishes() -> void:
+	var w := world(1)
+	var spot := AutoPlay.find_spot(w, "harbour")
+	check(spot.x >= 0, "a harbour spot on the water")
+	w.place("harbour", spot, true)
+	w.run(Defs.MONTH_TICKS * 2)
+	check(w.made.get("fish", 0) > 60, "harbour fish (%d)" % w.made.get("fish", 0))

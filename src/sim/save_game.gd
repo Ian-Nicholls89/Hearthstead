@@ -23,7 +23,8 @@ static func to_dict(w: World) -> Dictionary:
 		"road": Marshalls.raw_to_base64(w.road), "mark": Marshalls.raw_to_base64(w.mark),
 		"buildings": bs, "citizens": cs, "merchant": w.merchant, "pending_nomads": w.pending_nomads,
 		"log": w.events_log, "era": w.era, "techs": w.techs.keys(), "researching": w.researching,
-		"research": w.research, "knowledge": w.knowledge, "winters": w.winters, "history": w.history, "born": w.born_total, "died": w.died_total,
+		"research": w.research, "knowledge": w.knowledge, "winters": w.winters,
+		"traded": w.traded, "history": w.history, "born": w.born_total, "died": w.died_total,
 	}
 
 
@@ -80,6 +81,7 @@ static func from_dict(d: Dictionary) -> World:
 		w.research[k] = float(d.research[k])
 	w.knowledge = float(d.get("knowledge", 0.0))
 	w.winters = int(d.get("winters", 0))
+	w.traded = int(d.get("traded", 0))
 	if not d.has("era"):
 		# a town saved before progression: keep the techs for what it already built
 		for b in w.buildings.values():

@@ -792,7 +792,7 @@ func _refresh_progress_button() -> void:
 	var era_name: String = Progress.ERAS[world.era].name
 	if world.researching != "":
 		var t: Dictionary = Progress.TECHS[world.researching]
-		var pct := int(100.0 * world.research.get(world.researching, 0.0) / float(t.cost))
+		var pct := int(100.0 * world.research.get(world.researching, 0.0) / world.tech_cost(world.researching))
 		progress_button.text = "%s\n%s %d%%" % [era_name, t.name, pct]
 		progress_button.add_theme_color_override("font_color", CREAM)
 	elif _available_techs().is_empty():
@@ -838,7 +838,7 @@ func show_progress() -> void:
 	var line := "Knowledge: +%.1f a month from your people." % world.knowledge_rate()
 	if world.researching != "":
 		var t: Dictionary = Progress.TECHS[world.researching]
-		line += " Researching %s: %d / %d." % [t.name, int(world.research.get(world.researching, 0.0)), t.cost]
+		line += " Researching %s: %d / %d." % [t.name, int(world.research.get(world.researching, 0.0)), int(world.tech_cost(world.researching))]
 	elif world.knowledge >= 1.0:
 		line += " %d banked - choose a tech below." % int(world.knowledge)
 	body.add_child(label(line, 20))
@@ -867,8 +867,8 @@ func _tech_card(id: String) -> Button:
 	var note := ""
 	match state:
 		"done": note = "Learned"
-		"researching": note = "Researching %d / %d" % [int(world.research.get(id, 0.0)), t.cost]
-		"available": note = "Tap to research - %d knowledge" % t.cost
+		"researching": note = "Researching %d / %d" % [int(world.research.get(id, 0.0)), int(world.tech_cost(id))]
+		"available": note = "Tap to research - %d knowledge" % int(world.tech_cost(id))
 		"needs": note = "Needs " + ", ".join(t.needs.map(func(n): return Progress.TECHS[n].name))
 		"era": note = "In the %s era" % Progress.ERAS[int(t.era)].name
 	var b := Button.new()
@@ -902,7 +902,8 @@ func show_new_era(e: int) -> void:
 	if not new_techs.is_empty():
 		_text(v, "New to research: " + ", ".join(new_techs.map(func(id): return Progress.TECHS[id].name)) + ".", DIM, 19)
 	var rebuilt := {1: "Your huts are being rebuilt as timber-framed houses.",
-		2: "Your houses are being rebuilt taller, on stone footings."}
+		2: "Your houses are being rebuilt taller, on stone footings.",
+		3: "Your town grows grander: bigger homes, a stone church."}
 	if rebuilt.has(e):
 		_text(v, rebuilt[e], DIM, 19)
 	var h := HBoxContainer.new()
@@ -929,6 +930,7 @@ func _fill_trade() -> void:
 	var take_v := 0
 	for k in _trade_give:
 		give_v += _trade_give[k] * int(Defs.RES[k].value)
+	give_v = int(give_v * world.mod("trade"))
 	for k in _trade_take:
 		take_v += _trade_take[k] * int(Defs.RES[k].value)
 	for side in ["take", "give"]:

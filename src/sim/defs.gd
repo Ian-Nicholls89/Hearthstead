@@ -87,6 +87,7 @@ const RES := {
 	"bread":     {"name": "Bread", "food": true, "raw": false, "value": 6, "color": Color(0.85, 0.62, 0.3)},
 	"flour":     {"name": "Flour", "food": false, "raw": false, "value": 3, "color": Color(0.95, 0.93, 0.85)},
 	"wool":      {"name": "Wool", "food": false, "raw": false, "value": 4, "color": Color(0.92, 0.9, 0.86)},
+	"glass":     {"name": "Glass", "food": false, "raw": false, "value": 8, "color": Color(0.6, 0.85, 0.9)},
 }
 const FOODS := ["berries", "mushrooms", "venison", "fish", "wheat", "beans", "apples", "mutton", "bread"]
 const CROPS := ["wheat", "beans"]
@@ -174,13 +175,29 @@ const BUILD := {
 	"market": {"name": "Market", "kind": "market", "size": Vector2i(3, 3), "cost": {"logs": 50, "stone": 40},
 		"work": 600, "workers": 2, "radius": 16, "cat": "Town",
 		"desc": "Traders carry food and firewood to the homes around it."},
+	# large town
+	"harbour": {"name": "Harbour", "kind": "gather", "size": Vector2i(3, 3), "cost": {"logs": 80, "stone": 40},
+		"work": 700, "workers": 5, "radius": 11, "trip": 90, "yield": {"fish": 16}, "needs": "water",
+		"cat": "Food", "desc": "Boats bring in far more fish than a dock. Must touch water."},
+	"glassworks": {"name": "Glassworks", "kind": "process", "size": Vector2i(2, 2), "cost": {"logs": 40, "stone": 60},
+		"work": 500, "workers": 2, "input": {"stone": 1, "firewood": 1}, "output": {"glass": 2}, "time": 80,
+		"cat": "Industry", "desc": "Melts stone into glass in a hot kiln."},
+	"university": {"name": "University", "kind": "extract", "size": Vector2i(3, 3),
+		"cost": {"logs": 80, "stone": 120, "glass": 40}, "work": 1200, "workers": 3, "time": 120,
+		"yield": {"knowledge": 5}, "cat": "Town", "desc": "Scholars add a great deal to the town's knowledge."},
+	"plaza": {"name": "Fountain square", "kind": "decor", "size": Vector2i(3, 3), "cost": {"stone": 90, "glass": 10},
+		"work": 600, "radius": 14, "happy": 0.15, "cat": "Town",
+		"desc": "Clean water from the aqueduct: homes nearby are happier and fall ill less."},
+	"theatre": {"name": "Theatre", "kind": "decor", "size": Vector2i(3, 3), "cost": {"logs": 120, "stone": 40},
+		"work": 900, "radius": 20, "happy": 0.3, "cat": "Town", "desc": "Plays and music: a big lift for homes around it."},
 	"trading_post": {"name": "Trading post", "kind": "trade", "size": Vector2i(3, 3),
 		"cost": {"logs": 60, "stone": 40, "iron": 10}, "work": 500, "workers": 1, "cat": "Town",
 		"desc": "Merchants visit to barter. Needs a trader."},
 }
 const BUILD_ORDER := ["road", "house", "stone_house", "stockpile", "barn", "gatherer", "hunter", "fisher", "field",
 	"orchard", "pasture", "windmill", "bakery", "forester", "woodcutter", "herbalist", "quarry", "mine", "blacksmith",
-	"tailor", "weaver", "well", "chapel", "town_hall", "trading_post", "school", "tavern", "market"]
+	"tailor", "weaver", "harbour", "glassworks", "well", "chapel", "town_hall", "trading_post", "school", "tavern",
+	"market", "university", "plaza", "theatre"]
 const CATEGORIES := ["Roads", "Housing", "Storage", "Food", "Industry", "Town"]
 
 const FIELD_PLANT_TICKS := 15

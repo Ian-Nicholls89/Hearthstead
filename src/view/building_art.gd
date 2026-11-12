@@ -16,7 +16,15 @@ const RECIPES := {
 		[["HousesFirstAge1Level3", 1.0, 0.95, 1.8, 0]]],
 	"house@2": [[["HousesSecondAge1Level3", 1.0, 0.9, 1.75, 0]], [["HousesSecondAge3Level2", 1.0, 1.0, 1.95, 0]],
 		[["HousesSecondAge2Level2", 1.0, 1.0, 1.95, 0]]],
+	"house@3": [[["HousesSecondAge3Level3", 1.0, 1.0, 1.95, 0]], [["HousesSecondAge1Level3", 1.0, 0.9, 1.75, 0]],
+		[["HousesSecondAge2Level2", 1.0, 1.0, 1.95, 0]]],
 	"stone_house": [[["HousesSecondAge3Level1", 1.0, 0.95, 1.85, 0]]],
+	"harbour": [[["PortSecondAgeLevel1", 1.5, 1.5, 2.95, 0]]],
+	"glassworks": [[["WatchTowerSecondAgeLevel1", 1.0, 0.95, 1.85, 0]]],
+	"university": [[["BarracksSecondAgeLevel1", 1.5, 1.4, 2.9, 0]]],
+	"plaza": [[["TownCenterSecondAgeLevel1", 1.5, 1.5, 2.95, 0]]],
+	"theatre": [[["WonderFirstAgeLevel1", 1.5, 1.45, 2.9, 0]]],
+	"chapel@3": [[["TempleSecondAgeLevel2", 1.5, 1.5, 2.6, 0]]],
 	"windmill": [[["WindmillSecondAge", 1.0, 1.0, 1.95, 0]]],
 	"bakery": [[["HousesSecondAge2Level2", 1.0, 0.95, 1.9, 0], ["Cauldron", 1.75, 1.75, 0.35, 0]]],
 	"orchard": [[["Apple_4", 0.75, 0.75, 1.35, 0], ["Apple_4", 2.25, 0.8, 1.3, 70], ["Apple_4", 0.8, 2.2, 1.25, 140],
@@ -55,7 +63,7 @@ const RECIPES := {
 const PILES := {
 	"logs": ["Logs", 40], "firewood": ["Logs", 60], "stone": ["Rock", 40], "iron": ["Crate", 25],
 	"tools": ["Crate", 25], "coats": ["Bags", 25], "hides": ["Bags", 30], "herbs": ["Bags", 30],
-	"flour": ["Bags", 30], "bread": ["Crate", 30], "wool": ["Bags", 30], "apples": ["Crate", 30], "mutton": ["Crate", 30],
+	"glass": ["Crate", 25], "flour": ["Bags", 30], "bread": ["Crate", 30], "wool": ["Bags", 30], "apples": ["Crate", 30], "mutton": ["Crate", 30],
 }
 
 static var _cache := {}

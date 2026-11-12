@@ -725,7 +725,7 @@ static func _plan_work(w: World, c: Citizen, b: Building) -> bool:
 				if b.input.get(k, 0) < int(d.input[k]):
 					ready = false
 			if ready:
-				c.plan = [_go(b.door), _do("process", d.time, "Working at the " + b.title().to_lower(), {"b": b.id, "work": true})]
+				c.plan = [_go(b.door), _do("process", d.time * w.mod("workshop"), "Working at the " + b.title().to_lower(), {"b": b.id, "work": true})]
 				return true
 			for k in d.input:
 				if b.input.get(k, 0) >= int(d.input[k]):

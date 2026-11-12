@@ -25,6 +25,7 @@ var game := 1.0                   # deer left around a hunting lodge
 var forest := 0.0                 # 0..1 how wooded its radius is
 var fire := 0                     # ticks left burning, 0 = not on fire
 var warm := true                  # a house with firewood
+var cap_mul := 1.0                # storage capacity multiplier from techs
 
 
 func def() -> Dictionary:
@@ -63,7 +64,7 @@ func stock_total() -> int:
 
 
 func capacity() -> int:
-	return int(Defs.BUILD[type].get("capacity", 0))
+	return int(Defs.BUILD[type].get("capacity", 0) * cap_mul)
 
 
 func accepts(res: String) -> bool:

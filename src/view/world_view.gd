@@ -433,7 +433,7 @@ func _state(c: Citizen) -> Array:
 		"gather":
 			if b and b.type == "hunter":
 				return ["Pistol_Aim_Neutral", at]
-			if b and b.type == "fisher":
+			if b and b.type in ["fisher", "harbour"]:
 				return ["Idle_Torch", at]
 			return ["Fixing_Kneeling", at]
 		"plant", "plant_field", "harvest":
@@ -442,7 +442,7 @@ func _state(c: Citizen) -> Array:
 			return ["Sword_Attack", at]
 		"extract":
 			match b.type if b else "":
-				"school": return ["Idle_Talking", at]
+				"school", "university": return ["Idle_Talking", at]
 				"orchard", "pasture": return ["Interact", at]
 			return ["Sword_Attack", at]
 		"process":

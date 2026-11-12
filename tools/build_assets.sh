@@ -32,7 +32,10 @@ UltimateCrops/WheatCrop UltimateCrops/Wheat_4 UltimateCrops/Lettuce_2 UltimateCr
 UltimateFantasyRTS/HousesSecondAge1Level3 UltimateFantasyRTS/HousesSecondAge3Level2 UltimateFantasyRTS/HousesSecondAge2Level2
 UltimateFantasyRTS/WindmillSecondAge UltimateFantasyRTS/MarketSecondAgeLevel1 UltimateFantasyRTS/TowerHouseSecondAge
 MedievalVillage/Inn MedievalVillage/Cauldron UltimateCrops/Apple_4 UltimateCrops/AppleHarvested FarmBuildings/Fence2
-FarmAnimal/Sheep FarmAnimal/Cow"
+FarmAnimal/Sheep FarmAnimal/Cow
+UltimateFantasyRTS/BarracksSecondAgeLevel1 UltimateFantasyRTS/WatchTowerSecondAgeLevel1 UltimateFantasyRTS/PortSecondAgeLevel1
+UltimateFantasyRTS/TownCenterSecondAgeLevel1 UltimateFantasyRTS/WonderFirstAgeLevel1 UltimateFantasyRTS/TempleSecondAgeLevel2
+UltimateFantasyRTS/HousesSecondAge3Level3"
 
 fetch() {   # pack model outdir
   local f="build/usd-src/$1_$2.usda"

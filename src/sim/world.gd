@@ -61,6 +61,7 @@ var researching := ""
 var research := {}                   # tech id -> knowledge put in so far
 var knowledge := 0.0                 # gathered while nothing is being researched
 var winters := 0                     # winters the town has come through
+var traded := 0                      # value of goods given to merchants
 var sandbox := false                 # everything unlocked (tests, debugging)
 var _mods := {}
 var born_total := 0
@@ -321,6 +322,7 @@ func place(type: String, pos: Vector2i, instant := false) -> int:
 		b.field.fill(-1.0)
 		b.field_busy.resize(b.size.x * b.size.y)
 	buildings[b.id] = b
+	b.cap_mul = mod("storage")
 	if b.kind() != "field":
 		doors[b.door] = b.id
 	# clearing the ground is part of the work; what is cut goes into the site
@@ -693,7 +695,7 @@ func _markets() -> void:
 	for m in buildings.values():
 		if m.kind() != "market" or not m.built or m.workers.is_empty():
 			continue
-		var r := float(m.def().radius)
+		var r := float(m.def().radius) * mod("market_range")
 		var share: float = float(m.workers.size()) / m.max_workers()
 		for h in buildings.values():
 			if h.kind() != "house" or not h.built or h.residents.is_empty() or h.center().distance_to(m.center()) > r:
@@ -752,6 +754,9 @@ func job_name(c: Citizen) -> String:
 		"weaver": return "Weaver"
 		"school": return "Teacher"
 		"market": return "Market trader"
+		"harbour": return "Fisher"
+		"glassworks": return "Glassblower"
+		"university": return "Scholar"
 	return "Worker"
 
 
@@ -1104,8 +1109,9 @@ func trade(give: Dictionary, take: Dictionary) -> bool:
 		if take[k] < 0 or merchant.goods.get(k, 0) < take[k]:
 			return false
 		get_v += take[k] * int(Defs.RES[k].value)
-	if give_v < get_v or get_v == 0:
+	if give_v * mod("trade") < get_v or get_v == 0:
 		return false
+	traded += give_v
 	for k in give:
 		var left: int = give[k]
 		for s in storages():
@@ -1231,6 +1237,8 @@ func _recompute_mods() -> void:
 		var m: Dictionary = Progress.TECHS[id].get("mods", {})
 		for k in m:
 			_mods[k] = _mods.get(k, 1.0) * float(m[k])
+	for b in buildings.values():
+		b.cap_mul = mod("storage")
 
 
 ## "done", "researching", "available", "needs" (a prerequisite) or "era" (later era).
@@ -1254,6 +1262,10 @@ func start_research(id: String) -> bool:
 	return true
 
 
+func tech_cost(id: String) -> float:
+	return float(Progress.TECHS[id].cost) * mod("tech_cost")
+
+
 func knowledge_rate() -> float:
 	var adults := citizens.values().filter(func(c): return c.is_adult()).size()
 	return Progress.knowledge_rate(adults)
@@ -1263,7 +1275,7 @@ func _put_knowledge(amount: float) -> void:
 	knowledge += amount
 	if researching == "":
 		return
-	var cost := float(Progress.TECHS[researching].cost)
+	var cost := tech_cost(researching)
 	var have: float = research.get(researching, 0.0)
 	var add := minf(knowledge, cost - have)
 	research[researching] = have + add
@@ -1303,6 +1315,7 @@ func milestones() -> Array:
 			"pop": have = citizens.size()
 			"houses": have = buildings.values().filter(func(b): return b.kind() == "house" and b.built).size()
 			"winters": have = winters
+			"traded": have = traded
 			"techs": have = era_techs_done(era)
 			"crops":
 				for c in Defs.CROPS:

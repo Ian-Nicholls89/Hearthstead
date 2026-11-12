@@ -68,9 +68,14 @@ more cold), Paving (roads 25% faster), Faith (chapels lift spirits 60% more, nee
 Masonry), Schooling (schools: teachers add knowledge), Brewing (taverns: happier
 homes), Markets (markets carry food and firewood to nearby homes, needs Trade).
 
-### 4 Large town
-Guilds (workshop bonuses), university (knowledge), printing (cheaper techs), banking
-(better trade), harbour and ships, aqueducts (health), glassworks.
+### 4 Large town (in the game)
+Irrigation (fields +20%), Harbours (big fishing harbours; merchants call 1.5x as often),
+Granaries (stores hold 50% more, markets reach 30% further), Guilds (workshops 25%
+faster), Glassmaking (glassworks: stone and firewood to glass), Printing (techs cost
+20% less), University (scholars add a lot of knowledge; needs Schooling and
+Glassmaking, costs glass), Banking (your goods are worth 25% more to merchants),
+Aqueducts (fountain squares; illness 30% rarer), Theatre (a big lift for homes around
+it). Milestones on: 120 people, a university, 1500 worth of goods traded, 6 techs.
 
 ### 5 Industrial revolution
 Coal mining, steam engines and factories, brickworks and brick terraces, steelworks,
@@ -94,7 +99,7 @@ climate repair, the space programme and the Starport.
 1. **v0.4** - the system: eras, milestones, knowledge, tech tree, rule changes, eras 1-2
    (done).
 2. **v0.5** - Small town (done).
-3. **v0.6** - Large town.
+3. **v0.6** - Large town (done).
 4. **v0.7** - Industrial revolution and the climate meter.
 5. **v0.8** - City (electricity network).
 6. **v0.9** - Modern.

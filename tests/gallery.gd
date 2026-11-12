@@ -35,7 +35,10 @@ func _initialize() -> void:
 	var rows := ceili(names.size() / float(cols))
 	var cam := Camera3D.new(); r.add_child(cam)
 	var mid := Vector3((cols - 1) * cell / 2.0, 0, (rows - 1) * cell / 2.0)
-	cam.projection = Camera3D.PROJECTION_ORTHOGONAL; cam.size = rows * cell * 1.05; cam.look_at_from_position(mid + Vector3(0, 60, 50), mid)
+	cam.projection = Camera3D.PROJECTION_ORTHOGONAL
+	var aspect: float = float(root.size.x) / root.size.y
+	cam.size = maxf(rows * cell * 1.2, cols * cell * 1.05 / aspect)
+	cam.look_at_from_position(mid + Vector3(0, 60, 50), mid)
 	cam.fov = 50
 	for k in 6: await process_frame
 	root.get_texture().get_image().save_png(OS.get_environment("GALLERY") if OS.get_environment("GALLERY") != "" else "/tmp/gallery.png")

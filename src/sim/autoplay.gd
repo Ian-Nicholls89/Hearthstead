@@ -7,7 +7,8 @@ extends RefCounted
 const FOOD_ROTA := ["gatherer", "hunter", "field", "fisher", "field", "gatherer", "hunter", "field"]
 const EXTRAS := ["barn", "stockpile", "tailor", "herbalist", "mine", "blacksmith", "well", "town_hall",
 	"chapel", "stone_house", "trading_post", "well", "barn", "windmill", "bakery", "school", "market", "orchard",
-	"stone_house", "pasture", "weaver", "tavern", "stone_house"]
+	"stone_house", "pasture", "weaver", "tavern", "stone_house", "glassworks", "university", "plaza", "harbour",
+	"theatre"]
 
 var food_i := 0
 var extra_i := 0
@@ -16,7 +17,8 @@ var extra_i := 0
 ## The order a careful player might research in.
 const RESEARCH := ["agriculture", "stonework", "hide_working", "fishing", "herb_lore", "smithing", "crop_rotation",
 	"better_tools", "trade", "masonry", "medicine", "husbandry", "town_planning", "milling", "baking", "schooling",
-	"markets", "faith", "orchards", "shepherding", "weaving", "brewing", "paving"]
+	"markets", "faith", "orchards", "shepherding", "weaving", "brewing", "paving", "glassmaking", "university",
+	"printing", "granaries", "guilds", "harbours", "irrigation", "aqueducts", "banking", "theatre"]
 
 
 func act(w: World) -> void:
@@ -138,7 +140,7 @@ func _allocate(w: World) -> void:
 		[["blacksmith"], 1 if w.stock("tools") < w.citizens.size() else 0],
 		[["mine"], 2 if w.stock("iron") < 20 or w.stock("tools") < w.citizens.size() else 0],
 		[["herbalist"], 1], [["trading_post"], 1], [["windmill", "bakery", "school", "market"], 1],
-		[["orchard", "pasture", "weaver"], 1],
+		[["orchard", "pasture", "weaver", "glassworks", "university", "harbour"], 1],
 	]
 	# spare hands go where the town is shortest
 	var wood_short := w.stock("logs") < 80 or w.stock("firewood") < w.citizens.size() * 6

@@ -38,6 +38,8 @@ const LOOKS := {
 	"Weaver": [Color(0.5, 0.32, 0.6), "", ""],
 	"Teacher": [Color(0.2, 0.25, 0.45), "", ""],
 	"Market trader": [Color(0.85, 0.55, 0.2), "straw", "basket"],
+	"Glassblower": [Color(0.35, 0.55, 0.6), "", "hammer"],
+	"Scholar": [Color(0.15, 0.12, 0.2), "cap", ""],
 }
 
 static var _template: Node3D
