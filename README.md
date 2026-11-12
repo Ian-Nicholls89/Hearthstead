@@ -6,7 +6,7 @@ grow, cut and make. Keep them fed and warm, and the town grows.
 
 <p>
 <img src="docs/screenshots/autumn.png" width="49%"> <img src="docs/screenshots/winter.png" width="49%">
-<img src="docs/screenshots/close_up.png" width="49%"> <img src="docs/screenshots/villagers.png" width="49%">
+<img src="docs/screenshots/close_up.png" width="49%"> <img src="docs/screenshots/valley.png" width="49%">
 </p>
 
 ## Playing
@@ -32,8 +32,9 @@ nomads and visiting merchants.
   `autoplay.gd` (a simple player used for soak tests).
 - `src/view/` draws it: `villager.gd` (animated townspeople on Quaternius's animation
   library), `nature_view.gd` (Quaternius trees, bushes, rocks and grass per map chunk,
-  with seasonal versions and light stand-ins in the distance), procedural buildings in
-  `meshes.gd`, `world_view.gd` tying it together, `camera_rig.gd` for touch, and
+  with seasonal versions and light stand-ins in the distance), buildings assembled from
+  Quaternius models in `building_art.gd` (with live heaps of stored goods), water in
+  `water.gdshader`, `world_view.gd` tying it together, `camera_rig.gd` for touch, and
   `game.gd` which runs the clock and the tools.
 - `assets/` holds the CC0 models and animations; see `assets/CREDITS.md`.
 - `src/ui/hud.gd` is the whole interface, built in code.

@@ -4,12 +4,15 @@ extends SceneTree
 ## vertices so every model shares the one low-poly shader.
 
 func _init() -> void:
-	var dir := DirAccess.open("res://build/usd")
+	var src := OS.get_environment("SRC") if OS.get_environment("SRC") != "" else "res://build/usd"
+	var dst := OS.get_environment("DST") if OS.get_environment("DST") != "" else "res://assets/nature"
+	DirAccess.make_dir_recursive_absolute(dst)
+	var dir := DirAccess.open(src)
 	var n := 0
 	for f in dir.get_files():
 		if not f.ends_with(".json"):
 			continue
-		var d: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://build/usd/" + f))
+		var d: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(src + "/" + f))
 		var pos := PackedVector3Array()
 		var nrm := PackedVector3Array()
 		var col := PackedColorArray()
@@ -37,7 +40,7 @@ func _init() -> void:
 		im.add_surface(Mesh.PRIMITIVE_TRIANGLES, arrays)
 		im.generate_lods(25.0, 60.0, [])
 		var mesh := im.get_mesh()
-		var out := "res://assets/nature/%s.res" % f.get_basename()
+		var out := "%s/%s.res" % [dst, f.get_basename()]
 		ResourceSaver.save(mesh, out, ResourceSaver.FLAG_COMPRESS)
 		var lods := []
 		for l in im.get_surface_lod_count(0):

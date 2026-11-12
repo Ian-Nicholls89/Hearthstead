@@ -111,6 +111,24 @@ func _demo(args: Array) -> void:
 	for t in int(years * Defs.YEAR_TICKS):
 		ap.act(w)
 		w.step()
+	if "showcase" in args:
+		# one of every building near the camp, finished, with stores to show
+		for type in Defs.BUILD_ORDER:
+			if type in ["road", "field"]:
+				continue
+			var spot := AutoPlay.find_spot(w, type)
+			if spot.x >= 0:
+				var id := w.place(type, spot, true)
+				var b: Building = w.buildings.get(id)
+				if b and b.type == "stockpile":
+					b.inv = {"logs": 140, "stone": 90, "iron": 40}
+				elif b and b.kind() in ["gather", "process", "extract"]:
+					var d: Dictionary = Defs.BUILD[type]
+					var res: String = (d.get("yield", d.get("output", {"logs": 1}))).keys()[0]
+					b.inv[res] = 14
+		var fid := w.place("field", AutoPlay.find_spot(w, "field"), true)
+		for fi in w.buildings[fid].field.size():
+			w.buildings[fid].field[fi] = 0.4 + 0.6 * (fi % 6) / 5.0
 	_play(w)
 	game.set_speed(1)
 	if args.size() > i + 4:
@@ -122,6 +140,23 @@ func _demo(args: Array) -> void:
 	for a in args:
 		if a.begins_with("ui="):
 			ui = a.substr(3)
+		if a.begins_with("at="):
+			# look at the nearest water, ford, mountain or iron ground instead of the camp
+			var want: String = a.substr(3)
+			var c := Vector2(w.width / 2.0, w.height / 2.0)
+			var best := Vector2i(-1, -1)
+			for ti in w.terrain.size():
+				var ok := false
+				match want:
+					"water": ok = w.terrain[ti] == Defs.Terrain.WATER
+					"ford": ok = w.terrain[ti] == Defs.Terrain.FORD
+					"rock": ok = w.terrain[ti] == Defs.Terrain.ROCK
+					"iron": ok = w.feature[ti] == Defs.Feature.IRON_DEP
+					"stone": ok = w.feature[ti] == Defs.Feature.STONE_DEP
+				if ok and (best.x < 0 or Vector2(w.tile_of(ti)).distance_to(c) < Vector2(best).distance_to(c)):
+					best = w.tile_of(ti)
+			if best.x >= 0:
+				game.rig.focus(Vector3(best.x, 0, best.y))
 	for k in 5:
 		await get_tree().process_frame
 	match ui:

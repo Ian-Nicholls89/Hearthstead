@@ -19,14 +19,15 @@ var world: World
 var terrain_mat: ShaderMaterial
 var tree_mat: ShaderMaterial
 var thing_mat: ShaderMaterial
-var water_mat: StandardMaterial3D
+var water_mat: ShaderMaterial
 var nature: NatureView
 var villagers := {}                 # citizen id -> Villager
 var anim_speed := 1.0               # set by the game: 0 when paused
 var marks: MultiMeshInstance3D
 var roads: MultiMeshInstance3D
 var soil: MultiMeshInstance3D
-var crops: MultiMeshInstance3D
+var crops: MultiMeshInstance3D         # wheat
+var beans: MultiMeshInstance3D
 var building_nodes := {}            # id -> Node3D
 var prev_pos := {}                  # citizen id -> Vector2 at the start of the last step
 var facing := {}
@@ -48,11 +49,12 @@ func setup(w: World) -> void:
 	_build_water()
 	nature = NatureView.new()
 	add_child(nature)
-	nature.setup(world, tree_mat)
+	nature.setup(world, tree_mat, func(x: int, y: int) -> float: return _tile_height(x, y))
 	marks = _multimesh(Meshes.crate(), _flat_material(Color(0.9, 0.2, 0.15)), false)
 	roads = _multimesh(Meshes.flat_tile(), _flat_material(ROAD), false)
 	soil = _multimesh(Meshes.flat_tile(), _flat_material(FIELD_SOIL), false)
-	crops = _multimesh(Meshes.crop(), thing_mat, true)
+	crops = _multimesh(BuildingArt.model("Wheat"), thing_mat, true)
+	beans = _multimesh(BuildingArt.model("Lettuce_2"), thing_mat, true)
 	selection = MeshInstance3D.new()
 	var sm := StandardMaterial3D.new()
 	sm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -146,14 +148,20 @@ func _corner(x: int, y: int) -> float:
 func _tile_color(i: int) -> Color:
 	var j := _hash(i * 7 + 3)
 	match world.terrain[i]:
-		Defs.Terrain.WATER: return Color(0.33, 0.36, 0.28)
+		Defs.Terrain.WATER: return Color(0.5, 0.47, 0.34)
 		Defs.Terrain.FORD: return Color(0.6, 0.56, 0.42)
 		Defs.Terrain.ROCK: return Color(0.48, 0.46, 0.43).lightened(j * 0.12)
 	match world.feature[i]:
 		Defs.Feature.STONE_DEP: return Color(0.6, 0.6, 0.58).darkened(j * 0.12)
-		Defs.Feature.IRON_DEP: return Color(0.56, 0.36, 0.28).darkened(j * 0.12)
+		Defs.Feature.IRON_DEP: return Color(0.5, 0.4, 0.32).darkened(j * 0.12)
 	var f := clampf((world.fert[i] - 0.4) / 0.85, 0.0, 1.0)
 	var c := Color(0.48, 0.48, 0.26).lerp(GRASS_A, f).lerp(GRASS_B, j * 0.5)
+	var x := i % world.width
+	var y := i / world.width
+	for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		var t: Vector2i = Vector2i(x, y) + d
+		if world.in_bounds(t) and world.terrain[world.idx(t)] == Defs.Terrain.WATER:
+			return Color(0.66, 0.6, 0.42).lerp(c, j * 0.35)     # a sandy bank
 	return c
 
 
@@ -198,16 +206,51 @@ func _build_water() -> void:
 	var mi := MeshInstance3D.new()
 	var pm := PlaneMesh.new()
 	pm.size = Vector2(world.width, world.height)
+	pm.subdivide_width = world.width
+	pm.subdivide_depth = world.height
 	mi.mesh = pm
 	mi.position = Vector3(world.width / 2.0, -0.08, world.height / 2.0)
-	water_mat = StandardMaterial3D.new()
-	water_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	water_mat.albedo_color = Color(0.2, 0.42, 0.58, 0.8)
-	water_mat.roughness = 0.2
-	water_mat.metallic_specular = 0.6
+	water_mat = ShaderMaterial.new()
+	water_mat.shader = load("res://src/view/water.gdshader")
+	water_mat.set_shader_parameter("shore", _shore_texture())
+	water_mat.set_shader_parameter("map_size", Vector2(world.width, world.height))
 	mi.material_override = water_mat
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mi)
+
+
+## How far each water tile is from dry land, 0 at the bank to 1 at 5+ tiles.
+func _shore_texture() -> ImageTexture:
+	var w := world.width
+	var h := world.height
+	var dist := PackedInt32Array()
+	dist.resize(w * h)
+	dist.fill(99)
+	var q: Array[int] = []
+	for i in w * h:
+		var t := world.terrain[i]
+		if t != Defs.Terrain.WATER and t != Defs.Terrain.FORD:
+			dist[i] = 0
+			q.append(i)
+	var head := 0
+	while head < q.size():
+		var i: int = q[head]
+		head += 1
+		var x := i % w
+		var y := i / w
+		for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var nx: int = x + d.x
+			var ny: int = y + d.y
+			if nx < 0 or ny < 0 or nx >= w or ny >= h:
+				continue
+			var j := ny * w + nx
+			if dist[j] > dist[i] + 1:
+				dist[j] = dist[i] + 1
+				q.append(j)
+	var img := Image.create(w, h, false, Image.FORMAT_L8)
+	for i in w * h:
+		img.set_pixel(i % w, i / w, Color.from_hsv(0, 0, clampf((dist[i] - 0.5) / 5.0, 0.0, 1.0)))
+	return ImageTexture.create_from_image(img)
 
 
 # --- per frame --------------------------------------------------------------------
@@ -256,8 +299,10 @@ func _season() -> void:
 	terrain_mat.set_shader_parameter("snow", snow * 0.8)
 	tree_mat.set_shader_parameter("snow", snow * 0.7)
 	thing_mat.set_shader_parameter("snow", snow)
+	nature.mat.set_shader_parameter("snow", snow * 0.8)
+	water_mat.set_shader_parameter("ice", clampf((snow - 0.3) / 0.6, 0.0, 1.0))
 	tree_mat.set_shader_parameter("leaf_tint", Color(0.82, 0.42, 0.14, autumn * 0.8))
-	water_mat.albedo_color = Color(0.2, 0.42, 0.58, 0.8).lerp(Color(0.8, 0.88, 0.95, 0.95), snow * 0.8)
+
 
 
 func _draw_tiles() -> void:
@@ -288,8 +333,9 @@ func _fill(mmi: MultiMeshInstance3D, ts: Array) -> void:
 
 func _draw_fields() -> void:
 	var soil_t: Array[Transform3D] = []
-	var crop_t: Array[Transform3D] = []
-	var crop_c: Array[Color] = []
+	var crop := {"wheat": [[], []], "beans": [[], []]}     # crop -> [transforms, colours]
+	var wheat_fit := BuildingArt.place(BuildingArt.model("Wheat"), 0.5, 0.5, 1.15, 0)
+	var bean_fit := BuildingArt.place(BuildingArt.model("Lettuce_2"), 0.5, 0.5, 0.7, 0)
 	for b in world.buildings.values():
 		if b.kind() != "field":
 			continue
@@ -299,19 +345,25 @@ func _draw_fields() -> void:
 			var g: float = b.field[i]
 			if g < 0.0:
 				continue
-			var ripe: bool = g >= 1.0
+			# young crops are short and green, ripe ones full height and golden
+			var k := clampf((g - 0.55) / 0.45, 0.0, 1.0)
+			var fit: Transform3D = wheat_fit if b.crop == "wheat" else bean_fit
+			var tall := 0.42 if b.crop == "wheat" else 1.0
+			var grow := Transform3D(Basis().scaled(Vector3(0.6 + 0.4 * g, (0.15 + 0.85 * g) * tall, 0.6 + 0.4 * g)), Vector3(t.x, 0, t.y))
+			var turn := Transform3D(Basis(Vector3.UP, float(i % 4) * PI / 2.0), Vector3(0.5, 0, 0.5)) * Transform3D(Basis(), Vector3(-0.5, 0, -0.5))
+			crop[b.crop][0].append(grow * turn * fit)
 			var col: Color
 			if b.crop == "wheat":
-				col = Color(0.45, 0.65, 0.25).lerp(Color(0.92, 0.78, 0.32), clampf((g - 0.6) / 0.4, 0, 1))
+				col = Color(0.55, 0.85, 0.45).lerp(Color(1, 1, 1), k)
 			else:
-				col = Color(0.35, 0.6, 0.25).lerp(Color(0.25, 0.45, 0.18), clampf((g - 0.6) / 0.4, 0, 1))
-			var hgt: float = 0.05 + g * 0.4
-			crop_t.append(Transform3D(Basis().scaled(Vector3(1, hgt, 1)), Vector3(t.x, 0.0, t.y)))
-			crop_c.append(col if not ripe else col.lightened(0.1))
+				col = Color(0.8, 1.0, 0.8).lerp(Color(1, 1, 1), k)
+			crop[b.crop][1].append(col)
 	_fill(soil, soil_t)
-	_fill(crops, crop_t)
-	for i in crop_c.size():
-		crops.multimesh.set_instance_color(i, crop_c[i])
+	for kind in [["wheat", crops], ["beans", beans]]:
+		var mmi: MultiMeshInstance3D = kind[1]
+		_fill(mmi, crop[kind[0]][0])
+		for i in crop[kind[0]][1].size():
+			mmi.multimesh.set_instance_color(i, crop[kind[0]][1][i])
 
 
 func _draw_people(alpha: float) -> void:
@@ -415,16 +467,22 @@ func _sync_buildings() -> void:
 			node.position = Vector3(b.pos.x, 0, b.pos.y)
 			var mi := MeshInstance3D.new()
 			mi.name = "Body"
-			mi.mesh = Meshes.building(b.type)
+			mi.mesh = BuildingArt.mesh(b.type, b.id % BuildingArt.variants(b.type))
+			if mi.mesh == null:
+				mi.mesh = Meshes.building(b.type)
 			mi.material_override = thing_mat
 			node.add_child(mi)
+			var piles := Node3D.new()
+			piles.name = "Piles"
+			node.add_child(piles)
 			var sc := MeshInstance3D.new()
 			sc.name = "Scaffold"
 			sc.mesh = Meshes.scaffold(b.size)
 			sc.material_override = thing_mat
 			node.add_child(sc)
 			if b.kind() == "house":
-				node.add_child(_smoke(Vector3(1.45 if b.type == "house" else 0.5, 1.6, 0.75)))
+				var top := mi.mesh.get_aabb().end.y
+				node.add_child(_smoke(Vector3(1.3, top * 0.92, 0.75)))
 			add_child(node)
 			building_nodes[b.id] = node
 	_update_sites()
@@ -446,11 +504,52 @@ func _update_sites() -> void:
 			body.scale = Vector3(1, maxf(0.03, f), 1)
 			sc.visible = true
 		_fire(node, b)
+		_piles(node, b)
 		var smoke: CPUParticles3D = node.get_node_or_null("Smoke")
 		if smoke:
 			# a fire in the hearth when someone is home and it is cold, or at mealtimes
 			var cold: bool = Defs.MONTH_TEMP[world.month()] < Defs.COLD_BELOW + 4
 			smoke.emitting = b.built and not b.residents.is_empty() and b.warm and (cold or (b.id + world.tick / 200) % 3 == 0)
+
+
+## Stockpiles show their logs, stone and crates; workplaces show what waits to be
+## carried away, as heaps that grow with the amount.
+func _piles(node: Node3D, b: Building) -> void:
+	var holder: Node3D = node.get_node_or_null("Piles")
+	if holder == null:
+		return
+	var heaps: Array = []        # [model, x, z, size]
+	if b.built and b.type == "stockpile":
+		var slot := 0
+		for res in ["logs", "stone", "iron"]:
+			var n: int = ceili(b.inv.get(res, 0) / float(BuildingArt.PILES[res][1]))
+			for k in mini(n, 9 - slot):
+				heaps.append([BuildingArt.PILES[res][0], 0.55 + (slot % 3) * 0.95, 0.75 + (slot / 3) * 0.8, 0.8 if res == "logs" else 0.55])
+				slot += 1
+	elif b.built and b.kind() in ["gather", "process", "extract"] and b.stock_total() > 0:
+		var main := ""
+		for k in b.inv:
+			if main == "" or b.inv[k] > b.inv[main]:
+				main = k
+		var pile: Array = BuildingArt.PILES.get(main, ["Bags", 30])
+		var amount: float = clampf(float(b.inv[main]) / Defs.HAUL_AT, 0.3, 1.0)
+		var at: Vector2 = Vector2(b.size) - Vector2(0.35, 0.3)
+		heaps.append([pile[0], at.x, at.y, (0.75 if pile[0] == "Logs" else 0.45) * amount])
+	if b.built and b.type == "woodcutter" and b.input.get("logs", 0) > 0:
+		heaps.append(["Logs", 0.35, 1.7, 0.6 * clampf(b.input.logs / 10.0, 0.4, 1.0)])
+	var sig := str(heaps)
+	if holder.get_meta("sig", "") == sig:
+		return
+	holder.set_meta("sig", sig)
+	for c in holder.get_children():
+		c.queue_free()
+	for h in heaps:
+		var mi := MeshInstance3D.new()
+		var m := BuildingArt.model(h[0])
+		mi.mesh = m
+		mi.transform = BuildingArt.place(m, h[1], h[2], h[3], (int(h[1] * 37 + h[2] * 11) % 4) * 25.0)
+		mi.material_override = thing_mat
+		holder.add_child(mi)
 
 
 func _smoke(at: Vector3) -> CPUParticles3D:

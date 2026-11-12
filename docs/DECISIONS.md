@@ -31,3 +31,13 @@
   within ~38 m of the camera, the old procedural trees beyond. Vertex colours from USD
   are linear and converted to sRGB, because the Compatibility renderer shows vertex
   colours as stored.
+- **0.3 buildings: composed, merged models.** Each building type is a recipe of
+  Quaternius models placed on its footprint (`building_art.gd`) and merged into one
+  mesh, so a building is one draw call. Doors face +Z like the models. Stores and
+  workplaces show heaps (logs, stone, crates) that grow with what they hold.
+- **Water** is one subdivided plane with a shader: colour from a per-tile
+  distance-to-land texture (shallow to deep), a foam line at the banks, small waves,
+  and ice in winter. Banks are sandy; reeds, pebbles and lily pads line the shores.
+- **Mountains** get scattered peak models on rock tiles, more and bigger away from the
+  foot, drawn at every distance. The icon is rendered from the game's own models
+  (`tools/make_icon.gd` + `make_icon.py`).

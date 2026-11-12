@@ -49,8 +49,11 @@ func start(w: World) -> void:
 	sun.rotation_degrees = Vector3(-52, -35, 0)
 	sun.light_energy = 1.1
 	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 70.0
-	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
+	sun.directional_shadow_max_distance = 60.0
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+	sun.shadow_normal_bias = 2.5
+	sun.shadow_bias = 0.06
+	sun.shadow_blur = 1.5
 	add_child(sun)
 	view = WorldView.new()
 	add_child(view)
