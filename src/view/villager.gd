@@ -31,6 +31,13 @@ const LOOKS := {
 	"Stonecutter": [Color(0.66, 0.66, 0.62), "cap", "pick"],
 	"Miner": [Color(0.46, 0.32, 0.26), "cap", "pick"],
 	"Trader": [Color(0.78, 0.66, 0.18), "straw", ""],
+	"Miller": [Color(0.9, 0.88, 0.82), "cap", "sack"],
+	"Baker": [Color(0.95, 0.93, 0.88), "cap", ""],
+	"Orchardist": [Color(0.55, 0.62, 0.3), "straw", "basket"],
+	"Shepherd": [Color(0.55, 0.45, 0.32), "hood", "rod"],
+	"Weaver": [Color(0.5, 0.32, 0.6), "", ""],
+	"Teacher": [Color(0.2, 0.25, 0.45), "", ""],
+	"Market trader": [Color(0.85, 0.55, 0.2), "straw", "basket"],
 }
 
 static var _template: Node3D

@@ -28,12 +28,17 @@ UltimateFantasyRTS/Mine UltimateFantasyRTS/TempleFirstAgeLevel1 UltimateFantasyR
 UltimateFantasyRTS/MarketFirstAgeLevel2 MedievalVillage/Blacksmith MedievalVillage/Sawmill MedievalVillage/Well
 MedievalVillage/Cart MedievalVillage/BonfireLit MedievalVillage/MarketStand_1 MedievalVillage/MarketStand_2
 MedievalVillage/Hay MedievalVillage/Bags MedievalVillage/Fence Survival/Tent
-UltimateCrops/WheatCrop UltimateCrops/Wheat_4 UltimateCrops/Lettuce_2 UltimateCrops/Carrot_4"
+UltimateCrops/WheatCrop UltimateCrops/Wheat_4 UltimateCrops/Lettuce_2 UltimateCrops/Carrot_4
+UltimateFantasyRTS/HousesSecondAge1Level3 UltimateFantasyRTS/HousesSecondAge3Level2 UltimateFantasyRTS/HousesSecondAge2Level2
+UltimateFantasyRTS/WindmillSecondAge UltimateFantasyRTS/MarketSecondAgeLevel1 UltimateFantasyRTS/TowerHouseSecondAge
+MedievalVillage/Inn MedievalVillage/Cauldron UltimateCrops/Apple_4 UltimateCrops/AppleHarvested FarmBuildings/Fence2
+FarmAnimal/Sheep FarmAnimal/Cow"
 
 fetch() {   # pack model outdir
   local f="build/usd-src/$1_$2.usda"
   mkdir -p build/usd-src "$3"
-  [ -s "$f" ] || curl -sfL -o "$f" "$BASE/$1/S_$2.usda"
+  local p="S_"; case "$1" in FarmAnimal|UltimateAnimatedAnimals) p="SK_";; esac
+  [ -s "$f" ] || curl -sfL -o "$f" "$BASE/$1/$p$2.usda"
   python3 tools/usd2json.py "$f" "$3/$2.json" >/dev/null
 }
 for m in $NATURE; do fetch UltimateNature "$m" build/usd-nature; done

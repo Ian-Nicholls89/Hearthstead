@@ -438,10 +438,15 @@ func _state(c: Citizen) -> Array:
 			return ["Fixing_Kneeling", at]
 		"plant", "plant_field", "harvest":
 			return ["Fixing_Kneeling", at]
-		"chop", "clear", "extract", "build":
+		"chop", "clear", "build":
+			return ["Sword_Attack", at]
+		"extract":
+			match b.type if b else "":
+				"school": return ["Idle_Talking", at]
+				"orchard", "pasture": return ["Interact", at]
 			return ["Sword_Attack", at]
 		"process":
-			return ["Interact" if b and b.type == "tailor" else "Sword_Attack", at]
+			return ["Sword_Attack" if b and b.type in ["woodcutter", "blacksmith"] else "Interact", at]
 		"eat_store":
 			return ["Idle_Talking", at]
 		"idle":

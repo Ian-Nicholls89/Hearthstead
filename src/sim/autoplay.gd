@@ -6,7 +6,8 @@ extends RefCounted
 
 const FOOD_ROTA := ["gatherer", "hunter", "field", "fisher", "field", "gatherer", "hunter", "field"]
 const EXTRAS := ["barn", "stockpile", "tailor", "herbalist", "mine", "blacksmith", "well", "town_hall",
-	"chapel", "stone_house", "trading_post", "well", "barn"]
+	"chapel", "stone_house", "trading_post", "well", "barn", "windmill", "bakery", "school", "market", "orchard",
+	"stone_house", "pasture", "weaver", "tavern", "stone_house"]
 
 var food_i := 0
 var extra_i := 0
@@ -14,7 +15,8 @@ var extra_i := 0
 
 ## The order a careful player might research in.
 const RESEARCH := ["agriculture", "stonework", "hide_working", "fishing", "herb_lore", "smithing", "crop_rotation",
-	"better_tools", "trade", "masonry", "medicine", "husbandry", "town_planning"]
+	"better_tools", "trade", "masonry", "medicine", "husbandry", "town_planning", "milling", "baking", "schooling",
+	"markets", "faith", "orchards", "shepherding", "weaving", "brewing", "paving"]
 
 
 func act(w: World) -> void:
@@ -25,7 +27,7 @@ func act(w: World) -> void:
 			if w.start_research(id):
 				break
 	_allocate(w)
-	if w.stock("logs") < 40 and w.marked.is_empty():
+	if w.stock("logs") < 60 and w.marked.size() < 20:
 		_mark_trees(w)
 	if w.pending_nomads > 0:
 		w.answer_nomads(true)
@@ -60,14 +62,15 @@ func _one(w: World) -> bool:
 			if _try(w, t):
 				food_i = (food_i + k + 1) % FOOD_ROTA.size()
 				return true
-	if _capacity(w, ["forester"]) < 1 + _count(w, "house") / 3:
+	if _capacity(w, ["forester"]) < 4 + _count(w, "house") * 2:
 		return _try(w, "forester")
 	if w.stock("stone") < 30 and _capacity(w, ["quarry"]) < 3 + n / 10:
 		return _try(w, "quarry")
-	if w.stock("tools") < n / 2 and _count(w, "blacksmith") == 0:
-		if _count(w, "mine") == 0 and w.stock("iron") < 20:
+	if w.stock("tools") < n and w.unlocked("blacksmith"):
+		if _count(w, "mine") == 0:
 			return _try(w, "mine")
-		return _try(w, "blacksmith")
+		if _count(w, "blacksmith") == 0:
+			return _try(w, "blacksmith")
 	if w.stock("coats") < n / 3 and _count(w, "tailor") == 0:
 		if _count(w, "hunter") == 0:
 			return _try(w, "hunter")
@@ -133,10 +136,17 @@ func _allocate(w: World) -> void:
 		[["quarry"], 4 if w.stock("stone") < 40 else 2],
 		[["tailor"], 1 if w.stock("coats") < w.citizens.size() else 0],
 		[["blacksmith"], 1 if w.stock("tools") < w.citizens.size() else 0],
-		[["mine"], 2 if w.stock("iron") < 20 else 0],
-		[["herbalist"], 1], [["trading_post"], 1],
-		[["gatherer", "hunter", "fisher", "field"], 99],
+		[["mine"], 2 if w.stock("iron") < 20 or w.stock("tools") < w.citizens.size() else 0],
+		[["herbalist"], 1], [["trading_post"], 1], [["windmill", "bakery", "school", "market"], 1],
+		[["orchard", "pasture", "weaver"], 1],
 	]
+	# spare hands go where the town is shortest
+	var wood_short := w.stock("logs") < 80 or w.stock("firewood") < w.citizens.size() * 6
+	var food_short := w.food_total() < w.citizens.size() * 40
+	if wood_short and not food_short:
+		plan.append([["forester", "woodcutter"], 99])
+	plan.append([["gatherer", "hunter", "fisher", "field", "orchard", "pasture"], 99 if food_short or not wood_short else 2])
+	plan.append([["forester", "woodcutter", "quarry", "mine"], 99])
 	for p in plan:
 		var want: int = p[1]
 		var group := places.filter(func(b): return b.type in p[0])

@@ -82,8 +82,13 @@ const RES := {
 	"fish":      {"name": "Fish", "food": true, "raw": false, "value": 3, "color": Color(0.5, 0.65, 0.8)},
 	"wheat":     {"name": "Wheat", "food": true, "raw": false, "value": 2, "color": Color(0.9, 0.78, 0.35)},
 	"beans":     {"name": "Beans", "food": true, "raw": false, "value": 2, "color": Color(0.45, 0.6, 0.25)},
+	"apples":    {"name": "Apples", "food": true, "raw": false, "value": 3, "color": Color(0.8, 0.25, 0.2)},
+	"mutton":    {"name": "Mutton", "food": true, "raw": false, "value": 3, "color": Color(0.75, 0.4, 0.4)},
+	"bread":     {"name": "Bread", "food": true, "raw": false, "value": 6, "color": Color(0.85, 0.62, 0.3)},
+	"flour":     {"name": "Flour", "food": false, "raw": false, "value": 3, "color": Color(0.95, 0.93, 0.85)},
+	"wool":      {"name": "Wool", "food": false, "raw": false, "value": 4, "color": Color(0.92, 0.9, 0.86)},
 }
-const FOODS := ["berries", "mushrooms", "venison", "fish", "wheat", "beans"]
+const FOODS := ["berries", "mushrooms", "venison", "fish", "wheat", "beans", "apples", "mutton", "bread"]
 const CROPS := ["wheat", "beans"]
 
 # --- buildings -------------------------------------------------------------
@@ -119,7 +124,7 @@ const BUILD := {
 	"field": {"name": "Crop field", "kind": "field", "size": Vector2i(6, 6), "cost": {}, "work": 30, "workers": 3,
 		"cat": "Food", "desc": "Plant in spring, harvest in autumn. Wheat or beans; frost kills what is left."},
 	"forester": {"name": "Forester's lodge", "kind": "gather", "size": Vector2i(2, 2), "cost": {"logs": 20, "stone": 6},
-		"work": 160, "workers": 4, "radius": 10, "trip": 70, "yield": {"logs": 6},
+		"work": 160, "workers": 4, "radius": 10, "trip": 70, "yield": {"logs": 8},
 		"cat": "Industry", "desc": "Fells grown trees for logs and plants saplings."},
 	"herbalist": {"name": "Herbalist", "kind": "gather", "size": Vector2i(2, 2), "cost": {"logs": 22, "stone": 6},
 		"work": 160, "workers": 2, "radius": 10, "trip": 70, "yield": {"herbs": 3},
@@ -145,13 +150,37 @@ const BUILD := {
 		"work": 500, "radius": 16, "happy": 0.25, "cat": "Town", "desc": "Makes the homes around it happier."},
 	"town_hall": {"name": "Town hall", "kind": "hall", "size": Vector2i(3, 3), "cost": {"logs": 50, "stone": 50, "iron": 10},
 		"work": 500, "cat": "Town", "desc": "Nomads hear of your town and may ask to join."},
+	# small town
+	"windmill": {"name": "Windmill", "kind": "process", "size": Vector2i(2, 2), "cost": {"logs": 40, "stone": 30},
+		"work": 330, "workers": 2, "input": {"wheat": 2}, "output": {"flour": 2}, "time": 40,
+		"cat": "Food", "desc": "Grinds wheat into flour."},
+	"bakery": {"name": "Bakery", "kind": "process", "size": Vector2i(2, 2), "cost": {"logs": 30, "stone": 30},
+		"work": 300, "workers": 2, "input": {"flour": 2, "firewood": 1}, "output": {"bread": 5}, "time": 70,
+		"cat": "Food", "desc": "Bakes flour into bread: the most filling food there is."},
+	"orchard": {"name": "Orchard", "kind": "extract", "size": Vector2i(3, 3), "cost": {"logs": 20}, "work": 200,
+		"workers": 3, "time": 90, "yield": {"apples": 8}, "months": [5, 6, 7, 8], "cat": "Food",
+		"desc": "Apple trees, picked from late summer to late autumn."},
+	"pasture": {"name": "Sheep pasture", "kind": "extract", "size": Vector2i(4, 4), "cost": {"logs": 40}, "work": 250,
+		"workers": 2, "time": 110, "yield": {"wool": 3}, "extra": {"mutton": 0.5}, "cat": "Food",
+		"desc": "Sheep for wool, and some mutton."},
+	"weaver": {"name": "Weaver", "kind": "process", "size": Vector2i(2, 2), "cost": {"logs": 30, "stone": 15},
+		"work": 300, "workers": 2, "input": {"wool": 2}, "output": {"coats": 1}, "time": 110,
+		"cat": "Industry", "desc": "Weaves wool into warm coats."},
+	"school": {"name": "School", "kind": "extract", "size": Vector2i(3, 3), "cost": {"logs": 50, "stone": 50},
+		"work": 600, "workers": 2, "time": 120, "yield": {"knowledge": 2}, "cat": "Town",
+		"desc": "Teachers add to the town's knowledge."},
+	"tavern": {"name": "Tavern", "kind": "decor", "size": Vector2i(3, 3), "cost": {"logs": 60, "stone": 40},
+		"work": 600, "radius": 15, "happy": 0.2, "cat": "Town", "desc": "Ale and song: homes nearby are happier."},
+	"market": {"name": "Market", "kind": "market", "size": Vector2i(3, 3), "cost": {"logs": 50, "stone": 40},
+		"work": 600, "workers": 2, "radius": 16, "cat": "Town",
+		"desc": "Traders carry food and firewood to the homes around it."},
 	"trading_post": {"name": "Trading post", "kind": "trade", "size": Vector2i(3, 3),
 		"cost": {"logs": 60, "stone": 40, "iron": 10}, "work": 500, "workers": 1, "cat": "Town",
 		"desc": "Merchants visit to barter. Needs a trader."},
 }
 const BUILD_ORDER := ["road", "house", "stone_house", "stockpile", "barn", "gatherer", "hunter", "fisher", "field",
-	"forester", "woodcutter", "herbalist", "quarry", "mine", "blacksmith", "tailor", "well", "chapel",
-	"town_hall", "trading_post"]
+	"orchard", "pasture", "windmill", "bakery", "forester", "woodcutter", "herbalist", "quarry", "mine", "blacksmith",
+	"tailor", "weaver", "well", "chapel", "town_hall", "trading_post", "school", "tavern", "market"]
 const CATEGORIES := ["Roads", "Housing", "Storage", "Food", "Industry", "Town"]
 
 const FIELD_PLANT_TICKS := 15

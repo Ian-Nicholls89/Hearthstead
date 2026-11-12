@@ -36,7 +36,7 @@ static func _needs(w: World, c: Citizen) -> void:
 		if not warming:
 			var drain := Defs.WARMTH_DRAIN * (Defs.COLD_BELOW - temp) / 8.0
 			if c.coat > 0.0:
-				drain *= Defs.COAT_FACTOR
+				drain *= Defs.COAT_FACTOR * w.mod("cold")
 				c.coat = maxf(0.0, c.coat - Defs.COAT_WEAR)
 			c.warmth = maxf(0.0, c.warmth - drain)
 	else:
@@ -375,6 +375,9 @@ static func _effect(w: World, c: Citizen, s: Dictionary) -> bool:
 				return false
 			var d: Dictionary = b.def()
 			for k in d.yield:
+				if k == "knowledge":
+					w._put_knowledge(float(d.yield[k]))
+					continue
 				b.inv[k] = b.inv.get(k, 0) + int(d.yield[k])
 				w.count_made(k, int(d.yield[k]))
 			for k in d.get("extra", {}):
@@ -709,6 +712,9 @@ static func _plan_work(w: World, c: Citizen, b: Building) -> bool:
 		"extract":
 			if b.stock_total() - b.haul_reserved >= Defs.HAUL_AT:
 				return _plan_haul(w, c, b)
+			if d.has("months") and not w.month() in d.months:
+				# out of season: bring in what is left, then labour
+				return b.stock_total() - b.haul_reserved > 0 and _plan_haul(w, c, b)
 			c.plan = [_go(b.door), _do("extract", d.time, "Working the " + b.title().to_lower(), {"b": b.id, "work": true})]
 			return true
 		"process":
@@ -736,6 +742,9 @@ static func _plan_work(w: World, c: Citizen, b: Building) -> bool:
 			return _plan_farm(w, c, b)
 		"trade":
 			c.plan = [_go(b.door), _do("idle", 100, "Minding the trading post")]
+			return true
+		"market":
+			c.plan = [_go(b.door), _do("idle", 100, "Selling at the market")]
 			return true
 	return false
 

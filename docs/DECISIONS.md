@@ -47,3 +47,10 @@
   unless `sandbox`, which the tests use) and multiply rules through `World.mod()`.
   Buildings get era looks as `type@N` recipes; the view rebuilds them when the era
   changes. Saves from before 0.4 keep the techs for what they had already built.
+- **0.5 Small town.** New goods (flour, bread, apples, mutton, wool) and ten techs.
+  Orchards produce only in their months (`months` on an extract building); schools
+  are extract buildings whose yield is knowledge; markets are a monthly-ish top-up of
+  nearby homes from the stores (every 100 ticks) rather than walking traders, to keep
+  the sim cheap. Era looks: `house@2` (taller cottages on stone). The autoplayer now
+  puts spare hands where the town is shortest; long games (15+ years) still show it
+  stalling around 25-30 people with the wood economy tight - balance is stage v1.0.

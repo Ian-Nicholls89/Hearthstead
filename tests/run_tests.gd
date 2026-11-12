@@ -7,6 +7,13 @@ var current := ""
 
 
 func _init() -> void:
+	# a game script that fails to compile makes every test vacuous: fail loudly
+	for path in ["res://src/sim/world.gd", "res://src/sim/ai.gd", "res://src/view/game.gd", "res://src/ui/hud.gd"]:
+		var sc: GDScript = load(path)
+		if sc == null or not sc.can_instantiate():
+			print("FAIL %s does not compile" % path)
+			quit(1)
+			return
 	var only := OS.get_environment("ONLY")
 	var t0 := Time.get_ticks_msec()
 	for m in get_method_list():
@@ -400,3 +407,56 @@ func test_autoplay_reaches_the_village_era() -> void:
 		w.step()
 	print("    4 years with progression: era %d, techs %s, pop %d" % [w.era, w.techs.keys(), w.citizens.size()])
 	check(w.era >= 1, "reached the Village era in 4 years")
+
+
+# --- small town -------------------------------------------------------------------
+
+func test_mill_and_bakery_make_bread() -> void:
+	var w := world(1)
+	var cb := camp(w)
+	w.store_add(cb, "wheat", 200)
+	w.place("windmill", AutoPlay.find_spot(w, "windmill"), true)
+	w.place("bakery", AutoPlay.find_spot(w, "bakery"), true)
+	w.run(Defs.MONTH_TICKS * 3)
+	check(w.made.get("flour", 0) > 30, "flour milled (%d)" % w.made.get("flour", 0))
+	check(w.made.get("bread", 0) > 20, "bread baked (%d)" % w.made.get("bread", 0))
+
+
+func test_orchard_picks_only_in_season() -> void:
+	var w := world(1)
+	var id := w.place("orchard", AutoPlay.find_spot(w, "orchard"), true)
+	w.run(Defs.MONTH_TICKS * 4)
+	check(w.made.get("apples", 0) == 0, "no apples in spring")
+	w.run(Defs.MONTH_TICKS * 4)
+	check(w.made.get("apples", 0) > 40, "apples in late summer and autumn (%d)" % w.made.get("apples", 0))
+
+
+func test_schools_add_knowledge() -> void:
+	var a := world(1)
+	var b := world(1)
+	b.place("school", AutoPlay.find_spot(b, "school"), true)
+	a.run(Defs.MONTH_TICKS * 3)
+	b.run(Defs.MONTH_TICKS * 3)
+	check(b.knowledge > a.knowledge + 10, "teachers added knowledge (%.0f vs %.0f)" % [b.knowledge, a.knowledge])
+
+
+func test_markets_stock_homes() -> void:
+	var w := world(1)
+	var hid := w.place("house", AutoPlay.find_spot(w, "house"), true)
+	w.place("market", AutoPlay.find_spot(w, "market"), true)
+	var h: Building = w.buildings[hid]
+	for k in h.inv.keys():
+		h.inv[k] = 0
+	w.run(300)
+	var food := 0
+	for f in Defs.FOODS:
+		food += h.inv.get(f, 0)
+	check(food >= 10, "market delivered food (%d)" % food)
+
+
+func test_bread_milestone_counts() -> void:
+	var w := world(1, 1, true)
+	w.era = 2
+	w.made["bread"] = 640
+	var m: Array = w.milestones().filter(func(x): return x.text == "bread baked")
+	check(m.size() == 1 and m[0].have == 640 and m[0].need == 1000, "bread milestone %s" % str(m))

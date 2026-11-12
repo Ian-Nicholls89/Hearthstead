@@ -901,8 +901,10 @@ func show_new_era(e: int) -> void:
 	var new_techs: Array = Progress.TECHS.keys().filter(func(id): return int(Progress.TECHS[id].era) == e)
 	if not new_techs.is_empty():
 		_text(v, "New to research: " + ", ".join(new_techs.map(func(id): return Progress.TECHS[id].name)) + ".", DIM, 19)
-	if e == 1:
-		_text(v, "Your huts are being rebuilt as timber-framed houses.", DIM, 19)
+	var rebuilt := {1: "Your huts are being rebuilt as timber-framed houses.",
+		2: "Your houses are being rebuilt taller, on stone footings."}
+	if rebuilt.has(e):
+		_text(v, rebuilt[e], DIM, 19)
 	var h := HBoxContainer.new()
 	h.alignment = BoxContainer.ALIGNMENT_CENTER
 	h.add_child(btn("See the tech tree", show_progress, 240))

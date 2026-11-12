@@ -111,7 +111,11 @@ func _demo(args: Array) -> void:
 	for t in int(years * Defs.YEAR_TICKS):
 		ap.act(w)
 		w.step()
+	for a in args:
+		if a.begins_with("era="):
+			w.era = int(a.substr(4))
 	if "showcase" in args:
+		w.unlock_all()
 		# one of every building near the camp, finished, with stores to show
 		for type in Defs.BUILD_ORDER:
 			if type in ["road", "field"]:
@@ -155,6 +159,9 @@ func _demo(args: Array) -> void:
 					"stone": ok = w.feature[ti] == Defs.Feature.STONE_DEP
 				if ok and (best.x < 0 or Vector2(w.tile_of(ti)).distance_to(c) < Vector2(best).distance_to(c)):
 					best = w.tile_of(ti)
+			for b in w.buildings.values():
+				if want == "b:" + b.type:
+					best = Vector2i(b.center())
 			if best.x >= 0:
 				game.rig.focus(Vector3(best.x, 0, best.y))
 	for k in 5:

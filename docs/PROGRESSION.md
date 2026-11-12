@@ -60,9 +60,13 @@ Smithing (mines, blacksmiths), Better tools (tools last 2.5x), Masonry (stone ho
 chapels, fewer fires), Medicine (illness 40% rarer), Trade (trading posts, merchants
 twice as often), Town planning (town halls, faster roads).
 
-### 3 Small town
-Milling and baking (wheat to flour to bread), orchards, sheep and wool, weaving,
-taverns, faith, schools, markets that deliver to homes, stone roads.
+### 3 Small town (in the game)
+Milling (windmills: wheat to flour), Baking (bakeries: flour and firewood to bread,
+needs Milling), Orchards (apples, picked late summer to autumn), Shepherding (pastures:
+wool and mutton, needs Husbandry), Weaving (weavers: wool to coats, which keep out
+more cold), Paving (roads 25% faster), Faith (chapels lift spirits 60% more, needs
+Masonry), Schooling (schools: teachers add knowledge), Brewing (taverns: happier
+homes), Markets (markets carry food and firewood to nearby homes, needs Trade).
 
 ### 4 Large town
 Guilds (workshop bonuses), university (knowledge), printing (cheaper techs), banking
@@ -89,7 +93,7 @@ climate repair, the space programme and the Starport.
 
 1. **v0.4** - the system: eras, milestones, knowledge, tech tree, rule changes, eras 1-2
    (done).
-2. **v0.5** - Small town.
+2. **v0.5** - Small town (done).
 3. **v0.6** - Large town.
 4. **v0.7** - Industrial revolution and the climate meter.
 5. **v0.8** - City (electricity network).

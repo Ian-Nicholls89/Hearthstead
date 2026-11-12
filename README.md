@@ -5,7 +5,7 @@ exiles through the seasons: there is no money, only what your people gather,
 grow, cut and make. Keep them fed and warm, and the town grows.
 
 <p>
-<img src="docs/screenshots/autumn.png" width="49%"> <img src="docs/screenshots/winter.png" width="49%">
+<img src="docs/screenshots/small_town.png" width="49%"> <img src="docs/screenshots/winter.png" width="49%">
 <img src="docs/screenshots/close_up.png" width="49%"> <img src="docs/screenshots/valley.png" width="49%">
 </p>
 

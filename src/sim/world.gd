@@ -606,6 +606,8 @@ func step() -> void:
 		_burning(10)
 	if tick % 20 == 0:
 		_assign_jobs()
+	if tick % 100 == 0:
+		_markets()
 	if tick % Defs.MONTH_TICKS == 0:
 		_monthly()
 
@@ -685,6 +687,41 @@ func _assign_jobs() -> void:
 		builders += 1
 
 
+## Staffed markets top up the larders and woodpiles of homes around them from the
+## town's stores, saving the walk.
+func _markets() -> void:
+	for m in buildings.values():
+		if m.kind() != "market" or not m.built or m.workers.is_empty():
+			continue
+		var r := float(m.def().radius)
+		var share: float = float(m.workers.size()) / m.max_workers()
+		for h in buildings.values():
+			if h.kind() != "house" or not h.built or h.residents.is_empty() or h.center().distance_to(m.center()) > r:
+				continue
+			var food := 0
+			for f in Defs.FOODS:
+				food += h.inv.get(f, 0)
+			if food < Defs.HOME_FOOD_MAX / 2:
+				var want := int((Defs.HOME_FOOD_MAX / 2 - food) * share)
+				var kinds: Array = Defs.FOODS.filter(func(f): return stock(f) > 0)
+				kinds.sort_custom(func(a, b): return stock(a) > stock(b))
+				for f in kinds.slice(0, 3):
+					var got := _take_anywhere(f, ceili(want / 3.0))
+					h.inv[f] = h.inv.get(f, 0) + got
+			var wood: int = h.inv.get("firewood", 0)
+			if wood < Defs.HOME_WOOD_MAX / 2:
+				h.inv["firewood"] = wood + _take_anywhere("firewood", int((Defs.HOME_WOOD_MAX / 2 - wood) * share))
+
+
+func _take_anywhere(res: String, n: int) -> int:
+	var got := 0
+	for s in storages():
+		if got >= n:
+			break
+		got += store_take(s, res, n - got)
+	return got
+
+
 func job_name(c: Citizen) -> String:
 	if not c.is_adult():
 		return "Child"
@@ -708,6 +745,13 @@ func job_name(c: Citizen) -> String:
 		"quarry": return "Stonecutter"
 		"mine": return "Miner"
 		"trading_post": return "Trader"
+		"windmill": return "Miller"
+		"bakery": return "Baker"
+		"orchard": return "Orchardist"
+		"pasture": return "Shepherd"
+		"weaver": return "Weaver"
+		"school": return "Teacher"
+		"market": return "Market trader"
 	return "Worker"
 
 
@@ -947,8 +991,8 @@ func _happiness() -> void:
 			var bonus := 0.0
 			for d in decor:
 				if d.center().distance_to(home.center()) <= float(d.def().radius):
-					bonus += float(d.def().happy)
-			h += minf(bonus, 0.35)
+					bonus += float(d.def().happy) * (mod("chapel") if d.type == "chapel" else 1.0)
+			h += minf(bonus, 0.45)
 		var v := variety(c)
 		h += 0.05 * mini(v, 4)
 		if c.sick:
@@ -1264,7 +1308,9 @@ func milestones() -> Array:
 				for c in Defs.CROPS:
 					have += made.get(c, 0)
 			_:
-				if kind.begins_with("building:"):
+				if kind.begins_with("made:"):
+					have = made.get(kind.substr(5), 0)
+				elif kind.begins_with("building:"):
 					var type := kind.substr(9)
 					have = buildings.values().filter(func(b): return b.type == type and b.built).size()
 		out.append({"text": m[2], "have": have, "need": int(m[1])})
