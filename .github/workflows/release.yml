@@ -1,9 +1,16 @@
 name: Release
-# Tag vX.Y.Z to build a signed APK and publish it as a GitHub release.
+# Builds a signed APK and publishes it as a GitHub release, either when a vX.Y.Z tag
+# is pushed or from Actions > Release > Run workflow (which creates the tag).
 # Secrets: HS_GAME_KEYSTORE_BASE64, HS_GAME_KEYSTORE_PASSWORD, HS_GAME_KEY_ALIAS
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag to release, e.g. v0.1.0"
+        required: true
+        default: "v0.1.0"
 permissions:
   contents: write
 jobs:
@@ -31,6 +38,7 @@ jobs:
           godot --headless --path . --script res://tests/run_tests.gd
       - name: Build signed APK
         env:
+          VERSION: ${{ inputs.version || github.ref_name }}
           KS: ${{ secrets.HS_GAME_KEYSTORE_BASE64 }}
           GODOT_ANDROID_KEYSTORE_RELEASE_USER: ${{ secrets.HS_GAME_KEY_ALIAS }}
           GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: ${{ secrets.HS_GAME_KEYSTORE_PASSWORD }}
@@ -40,8 +48,11 @@ jobs:
           export GODOT_ANDROID_KEYSTORE_RELEASE_PATH=$RUNNER_TEMP/release.jks
           mkdir -p build
           godot --headless --path . --export-release "Android" build/hearthstead.apk
-          mv build/hearthstead.apk build/hearthstead-${GITHUB_REF_NAME}.apk
+          mv build/hearthstead.apk build/hearthstead-${VERSION}.apk
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.version || github.ref_name }}
+          name: Hearthstead ${{ inputs.version || github.ref_name }}
+          target_commitish: ${{ github.sha }}
           files: build/hearthstead-*.apk
           generate_release_notes: true
