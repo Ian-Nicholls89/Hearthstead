@@ -8,9 +8,12 @@ const ERAS := [
 		"milestones": [["pop", 20, "people"], ["houses", 5, "houses"], ["winters", 2, "winters survived"], ["techs", 3, "Settlement techs"]]},
 	{"name": "Village", "desc": "Timber-framed houses, tiled roofs, fields and the first trade.",
 		"milestones": [["pop", 40, "people"], ["crops", 1500, "crops harvested"], ["building:trading_post", 1, "trading post"], ["techs", 5, "Village techs"]]},
-	{"name": "Medieval town", "desc": "Stone, markets and faith.", "milestones": []},
-	{"name": "Industrial", "desc": "Brick, coal and steam.", "milestones": []},
-	{"name": "Electric", "desc": "Power lines, streetlights and modern medicine.", "milestones": []},
+	{"name": "Small town", "desc": "Stone houses, bread and wool, markets and faith.", "milestones": []},
+	{"name": "Large town", "desc": "Guilds, a university, printing and a harbour.", "milestones": []},
+	{"name": "Industrial revolution", "desc": "Coal, steam and brick - and smoke in the sky.", "milestones": []},
+	{"name": "City", "desc": "Electric light, trams and hospitals.", "milestones": []},
+	{"name": "Modern", "desc": "Cars, computers and a choice about the planet.", "milestones": []},
+	{"name": "Utopia", "desc": "Fusion, automation and the stars.", "milestones": []},
 ]
 
 ## id: name, era, branch, cost (knowledge), needs, what it does in words, and
