@@ -12,9 +12,18 @@ var food_i := 0
 var extra_i := 0
 
 
+## The order a careful player might research in.
+const RESEARCH := ["agriculture", "stonework", "hide_working", "fishing", "herb_lore", "smithing", "crop_rotation",
+	"better_tools", "trade", "masonry", "medicine", "husbandry", "town_planning"]
+
+
 func act(w: World) -> void:
 	if w.tick % Defs.MONTH_TICKS != 0:
 		return
+	if w.researching == "":
+		for id in RESEARCH:
+			if w.start_research(id):
+				break
 	_allocate(w)
 	if w.stock("logs") < 40 and w.marked.is_empty():
 		_mark_trees(w)
@@ -176,7 +185,7 @@ func _can_afford(w: World, type: String) -> bool:
 
 
 func _try(w: World, type: String) -> bool:
-	if not _can_afford(w, type):
+	if not w.unlocked(type) or not _can_afford(w, type):
 		return false
 	var spot := find_spot(w, type)
 	if spot.x < 0:

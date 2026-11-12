@@ -5,6 +5,7 @@ extends RefCounted
 
 signal event(text: String, kind: String)      # kind: info, good, bad, birth, death
 signal nomads_arrived(count: int)
+signal era_changed(era: int)
 
 const MALE_NAMES := ["Aldric", "Bram", "Cedric", "Duncan", "Edwin", "Finn", "Godric", "Hal", "Ivo", "Jory",
 	"Kit", "Leof", "Mabon", "Ned", "Osric", "Piers", "Rafe", "Silas", "Tam", "Ulric", "Wat", "Wystan", "Ansel",
@@ -53,6 +54,15 @@ var made := {}                       # res -> units produced, for stats and test
 var restockers := {}                 # house id -> citizen fetching for it
 var history: Array = []              # one entry per month
 var game_over := false
+# progression (see Progress and docs/PROGRESSION.md)
+var era := 0
+var techs := {}                      # tech id -> true once learned
+var researching := ""
+var research := {}                   # tech id -> knowledge put in so far
+var knowledge := 0.0                 # gathered while nothing is being researched
+var winters := 0                     # winters the town has come through
+var sandbox := false                 # everything unlocked (tests, debugging)
+var _mods := {}
 var born_total := 0
 var died_total := 0
 const CHUNK := 16                    # the view redraws the map in chunks this size
@@ -235,6 +245,8 @@ static func door_of(type: String, pos: Vector2i) -> Vector2i:
 ## Returns "" if the building fits there, otherwise the reason it does not.
 func can_place(type: String, pos: Vector2i) -> String:
 	var d: Dictionary = Defs.BUILD[type]
+	if not unlocked(type):
+		return "Not discovered yet: research %s" % Progress.TECHS[Progress.tech_for(type)].name
 	var s: Vector2i = d.size
 	var need_dep := 0
 	var water_near := false
@@ -703,6 +715,7 @@ func job_name(c: Citizen) -> String:
 
 func _monthly() -> void:
 	var m := month()
+	_progress_month()
 	_ageing()
 	_births()
 	_housing()
@@ -713,7 +726,7 @@ func _monthly() -> void:
 		_trees()
 	for b in buildings.values():
 		if b.built and b.type == "hunter":
-			b.game = minf(1.0, b.game + 0.08)
+			b.game = minf(1.0, b.game + 0.08 * mod("game"))
 		if b.built and b.kind() == "gather" and m % 3 == 0:
 			update_forest(b)
 	if m == Defs.FROST_MONTH:
@@ -894,7 +907,7 @@ func _illness() -> void:
 			var chance := 0.4
 			if h and h.inv.get("herbs", 0) > 0:
 				h.inv["herbs"] -= 1
-				chance = 0.85
+				chance = minf(0.98, 0.85 * mod("cure"))
 			if rng.randf() < chance:
 				c.sick = false
 			continue
@@ -905,7 +918,7 @@ func _illness() -> void:
 			p += 0.01
 		if c.age > Defs.OLD_AGE:
 			p += 0.01
-		if rng.randf() < p:
+		if rng.randf() < p * mod("illness"):
 			c.sick = true
 			say("%s has fallen ill." % c.name(), "bad")
 
@@ -1021,7 +1034,7 @@ func _merchant() -> void:
 	for b in buildings.values():
 		if b.type == "trading_post" and b.built and not b.workers.is_empty():
 			post = b
-	if post == null or rng.randf() > 0.3:
+	if post == null or rng.randf() > 0.3 * mod("merchant"):
 		return
 	var goods := {}
 	var pool := ["berries", "venison", "fish", "wheat", "beans", "tools", "coats", "iron", "logs", "stone",
@@ -1106,7 +1119,7 @@ func _fires() -> void:
 			continue
 		if b.type == "stockpile" or b.type == "camp":
 			continue
-		if rng.randf() < 0.0008:
+		if rng.randf() < 0.0008 * mod("fire"):
 			b.fire = 80 if _well_near(b) else 260
 			say("%s is on fire!" % b.title(), "bad")
 
@@ -1148,6 +1161,126 @@ func kill(c: Citizen, why: String) -> void:
 	citizens.erase(c.id)
 	died_total += 1
 	say("%s %s." % [c.name(), why], "death")
+
+
+# --- progression ---------------------------------------------------------------
+
+func unlocked(type: String) -> bool:
+	if sandbox or type in Progress.START_BUILDINGS:
+		return true
+	var t := Progress.tech_for(type)
+	return t == "" or techs.has(t)
+
+
+func unlock_all() -> void:
+	sandbox = true
+
+
+## A rule multiplier from the techs learned, 1.0 if none changes it.
+func mod(name: String) -> float:
+	return _mods.get(name, 1.0)
+
+
+func _recompute_mods() -> void:
+	_mods.clear()
+	for id in techs:
+		var m: Dictionary = Progress.TECHS[id].get("mods", {})
+		for k in m:
+			_mods[k] = _mods.get(k, 1.0) * float(m[k])
+
+
+## "done", "researching", "available", "needs" (a prerequisite) or "era" (later era).
+func tech_state(id: String) -> String:
+	var t: Dictionary = Progress.TECHS[id]
+	if techs.has(id):
+		return "done"
+	if int(t.era) > era:
+		return "era"
+	for n in t.needs:
+		if not techs.has(n):
+			return "needs"
+	return "researching" if researching == id else "available"
+
+
+func start_research(id: String) -> bool:
+	if not Progress.TECHS.has(id) or tech_state(id) not in ["available", "researching"]:
+		return false
+	researching = id
+	_put_knowledge(0.0)
+	return true
+
+
+func knowledge_rate() -> float:
+	var adults := citizens.values().filter(func(c): return c.is_adult()).size()
+	return Progress.knowledge_rate(adults)
+
+
+func _put_knowledge(amount: float) -> void:
+	knowledge += amount
+	if researching == "":
+		return
+	var cost := float(Progress.TECHS[researching].cost)
+	var have: float = research.get(researching, 0.0)
+	var add := minf(knowledge, cost - have)
+	research[researching] = have + add
+	knowledge -= add
+	if research[researching] >= cost - 0.001:
+		_learn(researching)
+
+
+func _learn(id: String) -> void:
+	techs[id] = true
+	research.erase(id)
+	if researching == id:
+		researching = ""
+	_recompute_mods()
+	var t: Dictionary = Progress.TECHS[id]
+	say("Discovered %s: %s" % [t.name, t.desc], "good")
+	building_revision += 1
+
+
+func era_techs_done(e: int) -> int:
+	var n := 0
+	for id in techs:
+		if int(Progress.TECHS[id].era) == e:
+			n += 1
+	return n
+
+
+## The milestones for leaving the current era: [{text, have, need}].
+func milestones() -> Array:
+	var out: Array = []
+	if era >= Progress.ERAS.size() - 1:
+		return out
+	for m in Progress.ERAS[era].milestones:
+		var have := 0
+		var kind: String = m[0]
+		match kind:
+			"pop": have = citizens.size()
+			"houses": have = buildings.values().filter(func(b): return b.kind() == "house" and b.built).size()
+			"winters": have = winters
+			"techs": have = era_techs_done(era)
+			"crops":
+				for c in Defs.CROPS:
+					have += made.get(c, 0)
+			_:
+				if kind.begins_with("building:"):
+					var type := kind.substr(9)
+					have = buildings.values().filter(func(b): return b.type == type and b.built).size()
+		out.append({"text": m[2], "have": have, "need": int(m[1])})
+	return out
+
+
+func _progress_month() -> void:
+	_put_knowledge(knowledge_rate())
+	if month() == 0 and tick > 0 and not citizens.is_empty():
+		winters += 1
+	var ms := milestones()
+	if not ms.is_empty() and ms.all(func(m): return m.have >= m.need):
+		era += 1
+		say("A new era begins: %s. %s" % [Progress.ERAS[era].name, Progress.ERAS[era].desc], "good")
+		era_changed.emit(era)
+		building_revision += 1
 
 
 # --- queries for the HUD ----------------------------------------------------

@@ -41,3 +41,9 @@
 - **Mountains** get scattered peak models on rock tiles, more and bigger away from the
   foot, drawn at every distance. The icon is rendered from the game's own models
   (`tools/make_icon.gd` + `make_icon.py`).
+- **0.4 progression** (`docs/PROGRESSION.md`). Milestones open eras; knowledge
+  (2 + 0.25 per adult a month) is spent on techs in a three-branch tree, banked when
+  nothing is being researched. Techs unlock buildings (gated in `World.can_place`
+  unless `sandbox`, which the tests use) and multiply rules through `World.mod()`.
+  Buildings get era looks as `type@N` recipes; the view rebuilds them when the era
+  changes. Saves from before 0.4 keep the techs for what they had already built.

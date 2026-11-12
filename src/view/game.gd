@@ -73,6 +73,7 @@ func start(w: World) -> void:
 	rig.blocked = hud.is_over_ui
 	world.event.connect(hud.toast)
 	world.nomads_arrived.connect(func(n): hud.ask_nomads(n))
+	world.era_changed.connect(func(e): hud.show_new_era(e))
 	_last_season = Defs.season_index(world.month())
 	if is_inside_tree():
 		get_tree().root.focus_exited.connect(save)

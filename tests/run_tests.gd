@@ -32,9 +32,11 @@ func check(cond: bool, what: String) -> void:
 		failures.append("%s: %s" % [current, what])
 
 
-func world(seed := 1, difficulty := 1) -> World:
+func world(seed := 1, difficulty := 1, progression := false) -> World:
 	var w := World.new()
 	w.new_game(seed, difficulty)
+	if not progression:
+		w.unlock_all()
 	return w
 
 
@@ -326,3 +328,75 @@ func test_autoplay_town_survives_three_years() -> void:
 		p.total, p.adults, w.born_total, w.died_total, w.food_total(), w.stock("firewood"), w.buildings.size()])
 	check(p.total >= 15, "town did not shrink (%d)" % p.total)
 	check(not w.game_over, "not wiped out")
+
+
+# --- progression ------------------------------------------------------------------
+
+func test_buildings_wait_for_their_tech() -> void:
+	var w := world(1, 1, true)
+	var spot := AutoPlay.find_spot(w, "house")
+	check(w.can_place("house", spot) == "", "houses from the start")
+	check(w.can_place("field", AutoPlay.find_spot(w, "house")).begins_with("Not discovered"), "fields need Agriculture")
+	check(w.start_research("agriculture"), "can research Agriculture")
+	check(not w.start_research("crop_rotation"), "Crop rotation is a later era")
+	for i in 8:
+		w.run(Defs.MONTH_TICKS)
+		if w.techs.has("agriculture"):
+			break
+	check(w.techs.has("agriculture"), "learned Agriculture within 8 months")
+	check(w.unlocked("field"), "fields unlocked")
+	check(w.researching == "", "free to choose the next")
+
+
+func test_knowledge_waits_when_nothing_is_researched() -> void:
+	var w := world(1, 1, true)
+	w.run(Defs.MONTH_TICKS * 3)
+	check(w.knowledge > 10, "knowledge banked (%.1f)" % w.knowledge)
+	w.start_research("fishing")
+	check(w.techs.has("fishing"), "banked knowledge pays straight into the choice")
+
+
+func test_milestones_open_the_next_era() -> void:
+	var w := world(1, 1, true)
+	check(w.era == 0, "starts in the Settlement era")
+	for id in ["agriculture", "fishing", "stonework"]:
+		w.techs[id] = true
+	w.winters = 2
+	for i in 5:
+		w.place("house", AutoPlay.find_spot(w, "house"), true)
+	for i in 6:
+		w.spawn(i % 2 == 0, 20.0, "Test", Vector2i(48, 48))
+	var ms := w.milestones()
+	check(ms.all(func(m): return m.have >= m.need), "all milestones met: %s" % str(ms))
+	w.run(Defs.MONTH_TICKS)
+	check(w.era == 1, "the Village era began")
+	check(w.tech_state("crop_rotation") == "available", "village techs open up")
+
+
+func test_techs_change_the_rules() -> void:
+	var w := world(1)
+	check(is_equal_approx(w.mod("field_yield"), 1.0), "no bonus before")
+	w._learn("crop_rotation")
+	check(is_equal_approx(w.mod("field_yield"), 1.25), "crop rotation +25%")
+	w._learn("better_tools")
+	check(is_equal_approx(w.mod("tool_wear"), 0.4), "better tools")
+
+
+func test_progress_is_saved() -> void:
+	var w := world(1, 1, true)
+	w.start_research("stonework")
+	w.run(Defs.MONTH_TICKS * 2)
+	w._learn("fishing")
+	var w2 := SaveGame.from_dict(JSON.parse_string(JSON.stringify(SaveGame.to_dict(w))))
+	check(w2.techs.has("fishing") and w2.researching == w.researching, "techs and research kept")
+	check(is_equal_approx(w2.research.get("stonework", 0.0), w.research.get("stonework", 0.0)), "research progress kept")
+
+
+func test_autoplay_reaches_the_village_era() -> void:
+	var w := world(2, 1, true)
+	var ap := AutoPlay.new()
+	for t in Defs.YEAR_TICKS * 4:
+		ap.act(w)
+		w.step()
+	print("    4 years with progression: era %d, techs %s, pop %d" % [w.era, w.techs.keys(), w.citizens.size()])
+	check(w.era >= 1, "reached the Village era in 4 years")

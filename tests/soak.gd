@@ -10,6 +10,8 @@ func _init() -> void:
 	for s in seeds:
 		var w := World.new()
 		w.new_game(int(s), diff)
+		if OS.get_environment("SANDBOX") != "":
+			w.unlock_all()
 		var ap := AutoPlay.new()
 		var t0 := Time.get_ticks_msec()
 		var made_before := {}
@@ -32,7 +34,7 @@ func _init() -> void:
 			for f in Defs.FOODS:
 				fm += w.made.get(f, 0) - made_before.get(f, 0)
 			made_before = w.made.duplicate()
-			printerr("      food made %d, jobs %s" % [fm, w.profession_counts()])
+			printerr("      food made %d, era %d, techs %d, jobs %s" % [fm, w.era, w.techs.size(), w.profession_counts()])
 			if w.game_over:
 				break
 		printerr("seed %s: %s after %d years, %d ms, born %d died %d" % [s, "DIED OUT" if w.game_over else "alive", years, Time.get_ticks_msec() - t0, w.born_total, w.died_total])

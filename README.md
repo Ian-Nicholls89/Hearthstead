@@ -19,6 +19,12 @@ grow, cut and make. Keep them fed and warm, and the town grows.
 - **Survive:** people eat, need firewood in winter, wear out tools and coats, fall
   ill without herbs, and age. Families in houses have children, who start work at six.
 
+**Progress** (see `docs/PROGRESSION.md`): the town moves through eras, from a
+Settlement of wooden huts to a Village of timber-framed cottages, and on (in later
+updates) to a Medieval town, the Industrial age and Electricity. Milestones open each
+era; your people's knowledge buys techs in a branching tree that unlock buildings and
+change the rules (better harvests, longer-lasting tools, rarer illness, more traders).
+
 Everything the town makes: food (berries, mushrooms, venison, fish, wheat, beans),
 logs, firewood, stone, iron, tools, hides, coats and herbs. Nineteen buildings,
 from the gatherer's hut to the chapel and the trading post. Fires, illness,

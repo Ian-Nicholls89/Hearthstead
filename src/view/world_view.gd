@@ -453,7 +453,19 @@ func _state(c: Citizen) -> Array:
 
 # --- buildings ---------------------------------------------------------------------
 
+var _era := -1
+
+
 func _sync_buildings() -> void:
+	if world.era != _era:
+		# a new era: the town rebuilds in its style
+		_era = world.era
+		for id in building_nodes:
+			var b: Building = world.buildings.get(id)
+			var body: MeshInstance3D = building_nodes[id].get_node("Body")
+			var m := BuildingArt.mesh(b.type, b.id % 3, _era) if b else null
+			if m:
+				body.mesh = m
 	for id in building_nodes.keys():
 		if not world.buildings.has(id):
 			building_nodes[id].queue_free()
@@ -467,7 +479,7 @@ func _sync_buildings() -> void:
 			node.position = Vector3(b.pos.x, 0, b.pos.y)
 			var mi := MeshInstance3D.new()
 			mi.name = "Body"
-			mi.mesh = BuildingArt.mesh(b.type, b.id % BuildingArt.variants(b.type))
+			mi.mesh = BuildingArt.mesh(b.type, b.id % 3, world.era)
 			if mi.mesh == null:
 				mi.mesh = Meshes.building(b.type)
 			mi.material_override = thing_mat

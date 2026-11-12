@@ -75,7 +75,7 @@ static func walk_speed(w: World, c: Citizen) -> float:
 	if w.in_bounds(t):
 		var i := w.idx(t)
 		if w.road[i]:
-			s *= Defs.ROAD_SPEED_MUL
+			s *= Defs.ROAD_SPEED_MUL * w.mod("road")
 		elif w.terrain[i] == Defs.Terrain.FORD:
 			s *= Defs.FORD_SPEED_MUL
 		elif w.feature[i] == Defs.Feature.TREE and w.growth[i] > 0.3:
@@ -186,9 +186,9 @@ static func _add_carry(c: Citizen, res: String, n: int, w: World = null) -> void
 			w.count_made(res, n)
 
 
-static func _wear_tool(c: Citizen) -> void:
+static func _wear_tool(c: Citizen, w: World = null) -> void:
 	if c.tool > 0.0:
-		c.tool = maxf(0.0, c.tool - Defs.TOOL_WEAR)
+		c.tool = maxf(0.0, c.tool - Defs.TOOL_WEAR * (w.mod("tool_wear") if w else 1.0))
 
 
 static func _eat(w: World, c: Citizen, from: Building, store: bool) -> bool:
@@ -330,9 +330,9 @@ static func _effect(w: World, c: Citizen, s: Dictionary) -> bool:
 			var n := int(amount) + (1 if w.rng.randf() < fmod(amount, 1.0) else 0)
 			_add_carry(c, res, n, w)
 			for k in d.get("extra", {}):
-				if w.rng.randf() < 0.75:
+				if w.rng.randf() < 0.75 * (w.mod("hides") if k == "hides" else 1.0):
 					_add_carry(c, k, int(d.extra[k]), w)
-			_wear_tool(c)
+			_wear_tool(c, w)
 			return true
 		"chop":
 			_release_tile(w, c)
@@ -342,7 +342,7 @@ static func _effect(w: World, c: Citizen, s: Dictionary) -> bool:
 				return false
 			_add_carry(c, "logs", int(b.def().yield.logs) if b else 5, w)
 			w.set_tree(t, 0.02)   # the forester replants as they go
-			_wear_tool(c)
+			_wear_tool(c, w)
 			return true
 		"plant":
 			_release_tile(w, c)
@@ -368,7 +368,7 @@ static func _effect(w: World, c: Citizen, s: Dictionary) -> bool:
 					n = 1
 				_add_carry(c, k, n, w)
 			w.clear_feature(t)
-			_wear_tool(c)
+			_wear_tool(c, w)
 			return true
 		"extract":
 			if b == null:
@@ -381,7 +381,7 @@ static func _effect(w: World, c: Citizen, s: Dictionary) -> bool:
 				if w.rng.randf() < float(d.extra[k]):
 					b.inv[k] = b.inv.get(k, 0) + 1
 					w.count_made(k, 1)
-			_wear_tool(c)
+			_wear_tool(c, w)
 			return true
 		"process":
 			if b == null:
@@ -395,7 +395,7 @@ static func _effect(w: World, c: Citizen, s: Dictionary) -> bool:
 			for k in d.output:
 				b.inv[k] = b.inv.get(k, 0) + int(d.output[k])
 				w.count_made(k, int(d.output[k]))
-			_wear_tool(c)
+			_wear_tool(c, w)
 			return true
 		"plant_field":
 			if b == null:
@@ -403,7 +403,7 @@ static func _effect(w: World, c: Citizen, s: Dictionary) -> bool:
 			b.field_busy[s.fi] = 0
 			if b.field[s.fi] < 0.0 and w.month() in Defs.PLANT_MONTHS:
 				b.field[s.fi] = 0.0
-			_wear_tool(c)
+			_wear_tool(c, w)
 			return true
 		"harvest":
 			if b == null:
@@ -411,17 +411,17 @@ static func _effect(w: World, c: Citizen, s: Dictionary) -> bool:
 			b.field_busy[s.fi] = 0
 			if b.field[s.fi] >= 1.0:
 				var t := w.field_tile(b, s.fi)
-				var amount := Defs.FIELD_YIELD * w.fert[w.idx(t)]
+				var amount := Defs.FIELD_YIELD * w.fert[w.idx(t)] * w.mod("field_yield")
 				b.inv[b.crop] = b.inv.get(b.crop, 0) + int(round(amount))
 				w.count_made(b.crop, int(round(amount)))
 				b.field[s.fi] = -1.0
-			_wear_tool(c)
+			_wear_tool(c, w)
 			return true
 		"build":
 			if b == null or b.built:
 				return b != null
 			b.progress = minf(b.work, b.progress + float(s.n))
-			_wear_tool(c)
+			_wear_tool(c, w)
 			_maybe_finish(w, b)
 			return true
 		"fetch_tool":

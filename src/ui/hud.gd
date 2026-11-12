@@ -26,6 +26,8 @@ var place_button: Button
 var inspector: PanelContainer
 var insp_box: VBoxContainer
 var toasts: VBoxContainer
+var progress_button: Button
+var mark_button: Button
 var modal: Control
 var panel_stack: Array[Control] = []
 var _category := ""
@@ -225,12 +227,15 @@ func _bottom_bar() -> void:
 	root.add_child(tools)
 	var th := HBoxContainer.new()
 	tools.add_child(th)
-	for t in [["Clear", "clear"], ["Unmark", "unclear"], ["Remove", "demolish"]]:
+	for t in [["Clear", "clear"], ["Remove", "demolish"]]:
 		var b := btn(t[0], func(): _toggle_tool(t[1]))
 		b.toggle_mode = true
 		b.set_meta("tool", t[1])
 		th.add_child(b)
 	th.add_child(btn("Town", show_town))
+	progress_button = btn("Progress", show_progress, 170)
+	progress_button.add_theme_font_size_override("font_size", 17)
+	th.add_child(progress_button)
 	palette = PanelContainer.new()
 	palette.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	palette.grow_vertical = Control.GROW_DIRECTION_BEGIN
@@ -255,6 +260,8 @@ func _bottom_bar() -> void:
 	pv.add_child(place_label)
 	place_button = btn("Build here", game.confirm_place, 150)
 	pv.add_child(place_button)
+	mark_button = btn("Unmark instead", func(): game.set_tool("unclear" if game.tool == "clear" else "clear"), 170)
+	pv.add_child(mark_button)
 	pv.add_child(btn("Done", func(): game.set_tool(""), 110))
 
 
@@ -279,8 +286,12 @@ func _open_category(cat: String) -> void:
 		if d.get("cat", "") != cat:
 			continue
 		var cost := _cost_text(d.cost)
-		var b := btn("%s\n%s" % [d.name, cost], func(): _pick(type), 150)
+		var open := world.unlocked(type)
+		var sub: String = cost if open else "needs " + Progress.TECHS[Progress.tech_for(type)].name
+		var b := btn("%s\n%s" % [d.name, sub], func(): _pick(type), 150)
 		b.add_theme_font_size_override("font_size", 19)
+		if not open:
+			b.modulate = Color(1, 1, 1, 0.5)
 		b.custom_minimum_size = Vector2(160, 80)
 		b.tooltip_text = d.desc
 		palette_row.add_child(b)
@@ -301,6 +312,10 @@ func _cost_text(cost: Dictionary) -> String:
 func _pick(type: String) -> void:
 	palette.visible = false
 	_category = ""
+	if not world.unlocked(type):
+		toast("%s needs %s. Research it in Progress." % [Defs.BUILD[type].name, Progress.TECHS[Progress.tech_for(type)].name], "info")
+		show_progress()
+		return
 	game.set_tool(type)
 	toast(Defs.BUILD[type].desc, "info")
 
@@ -329,9 +344,12 @@ func refresh() -> void:
 	for b in build_bar.get_children():
 		b.set_pressed_no_signal(b.get_meta("cat") == _category)
 	for b in _tool_buttons():
-		b.set_pressed_no_signal(b.get_meta("tool") == game.tool)
+		b.set_pressed_no_signal(b.get_meta("tool") == game.tool or (b.get_meta("tool") == "clear" and game.tool == "unclear"))
 	var t := game.tool
 	place_bar.visible = t != ""
+	mark_button.visible = t in ["clear", "unclear"]
+	mark_button.text = "Unmark instead" if t == "clear" else "Mark instead"
+	_refresh_progress_button()
 	if Defs.BUILD.has(t) and t != "road":
 		place_button.visible = true
 		place_button.disabled = game.ghost_reason != ""
@@ -764,6 +782,132 @@ func show_town(tab := 0) -> void:
 	st.add_child(graph)
 	tabs.current_tab = tab
 	v.add_child(btn("Close", _close))
+
+
+# --- progress ---------------------------------------------------------------------------------------
+
+func _refresh_progress_button() -> void:
+	if progress_button == null:
+		return
+	var era_name: String = Progress.ERAS[world.era].name
+	if world.researching != "":
+		var t: Dictionary = Progress.TECHS[world.researching]
+		var pct := int(100.0 * world.research.get(world.researching, 0.0) / float(t.cost))
+		progress_button.text = "%s\n%s %d%%" % [era_name, t.name, pct]
+		progress_button.add_theme_color_override("font_color", CREAM)
+	elif _available_techs().is_empty():
+		progress_button.text = "%s\nProgress" % era_name
+		progress_button.add_theme_color_override("font_color", CREAM)
+	else:
+		progress_button.text = "%s\nChoose research" % era_name
+		progress_button.add_theme_color_override("font_color", Color(1.0, 0.85, 0.4))
+
+
+func _available_techs() -> Array:
+	return Progress.TECHS.keys().filter(func(id): return world.tech_state(id) == "available")
+
+
+func show_progress() -> void:
+	var v := _modal("Progress", true, true, 1000)
+	var sc := ScrollContainer.new()
+	sc.custom_minimum_size = Vector2(960, 470)
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	v.add_child(sc)
+	var body := VBoxContainer.new()
+	body.add_theme_constant_override("separation", 10)
+	body.custom_minimum_size = Vector2(930, 0)
+	sc.add_child(body)
+	var era: Dictionary = Progress.ERAS[world.era]
+	body.add_child(label("Era %d of %d: %s" % [world.era + 1, Progress.ERAS.size(), era.name], 26))
+	var d := label(era.desc, 19, DIM)
+	d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.add_child(d)
+	var ms := world.milestones()
+	if not ms.is_empty():
+		body.add_child(label("To reach the %s era:" % Progress.ERAS[world.era + 1].name, 22))
+		var grid := GridContainer.new()
+		grid.columns = 2
+		grid.add_theme_constant_override("h_separation", 40)
+		for m in ms:
+			var done: bool = m.have >= m.need
+			grid.add_child(label(("Done: " if done else "") + m.text, 20, GOOD if done else CREAM))
+			grid.add_child(label("%d / %d" % [mini(m.have, m.need), m.need], 20, GOOD if done else DIM))
+		body.add_child(grid)
+	elif world.era < Progress.ERAS.size() - 1:
+		body.add_child(label("The road to the %s era comes in a later update." % Progress.ERAS[world.era + 1].name, 20, DIM))
+	var line := "Knowledge: +%.1f a month from your people." % world.knowledge_rate()
+	if world.researching != "":
+		var t: Dictionary = Progress.TECHS[world.researching]
+		line += " Researching %s: %d / %d." % [t.name, int(world.research.get(world.researching, 0.0)), t.cost]
+	elif world.knowledge >= 1.0:
+		line += " %d banked - choose a tech below." % int(world.knowledge)
+	body.add_child(label(line, 20))
+	for e in range(0, mini(world.era + 2, Progress.ERAS.size())):
+		var ids: Array = Progress.TECHS.keys().filter(func(id): return int(Progress.TECHS[id].era) == e)
+		if ids.is_empty():
+			continue
+		body.add_child(label("%s techs%s" % [Progress.ERAS[e].name, "" if e <= world.era else " (next era)"], 23, Color(0.96, 0.85, 0.6)))
+		var cols := HBoxContainer.new()
+		cols.add_theme_constant_override("separation", 12)
+		for branch in Progress.BRANCHES:
+			var col := VBoxContainer.new()
+			col.custom_minimum_size = Vector2(300, 0)
+			col.add_child(label(branch, 18, DIM))
+			for id in ids:
+				if Progress.TECHS[id].branch == branch:
+					col.add_child(_tech_card(id))
+			cols.add_child(col)
+		body.add_child(cols)
+	v.add_child(btn("Close", _close))
+
+
+func _tech_card(id: String) -> Button:
+	var t: Dictionary = Progress.TECHS[id]
+	var state := world.tech_state(id)
+	var note := ""
+	match state:
+		"done": note = "Learned"
+		"researching": note = "Researching %d / %d" % [int(world.research.get(id, 0.0)), t.cost]
+		"available": note = "Tap to research - %d knowledge" % t.cost
+		"needs": note = "Needs " + ", ".join(t.needs.map(func(n): return Progress.TECHS[n].name))
+		"era": note = "In the %s era" % Progress.ERAS[int(t.era)].name
+	var b := Button.new()
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(300, 112)
+	b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	b.text = "%s\n%s\n%s" % [t.name, t.desc, note]
+	b.add_theme_font_size_override("font_size", 17)
+	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	var sb := StyleBoxFlat.new()
+	sb.set_corner_radius_all(10)
+	sb.set_content_margin_all(10)
+	sb.bg_color = {"done": Color(0.22, 0.36, 0.2), "researching": Color(0.6, 0.43, 0.2),
+		"available": Color(0.3, 0.24, 0.17)}.get(state, Color(0.18, 0.16, 0.14))
+	for k in ["normal", "hover", "pressed", "disabled"]:
+		b.add_theme_stylebox_override(k, sb)
+	if state in ["needs", "era"]:
+		b.add_theme_color_override("font_color", Color(0.6, 0.56, 0.5))
+	if state in ["available", "researching"]:
+		b.pressed.connect(func():
+			world.start_research(id)
+			toast("Researching %s." % t.name, "info")
+			show_progress())
+	return b
+
+
+func show_new_era(e: int) -> void:
+	var v := _modal("A new era: %s" % Progress.ERAS[e].name, true, true, 700)
+	_text(v, Progress.ERAS[e].desc)
+	var new_techs: Array = Progress.TECHS.keys().filter(func(id): return int(Progress.TECHS[id].era) == e)
+	if not new_techs.is_empty():
+		_text(v, "New to research: " + ", ".join(new_techs.map(func(id): return Progress.TECHS[id].name)) + ".", DIM, 19)
+	if e == 1:
+		_text(v, "Your huts are being rebuilt as timber-framed houses.", DIM, 19)
+	var h := HBoxContainer.new()
+	h.alignment = BoxContainer.ALIGNMENT_CENTER
+	h.add_child(btn("See the tech tree", show_progress, 240))
+	h.add_child(btn("Carry on", _close, 160))
+	v.add_child(h)
 
 
 func show_trade() -> void:

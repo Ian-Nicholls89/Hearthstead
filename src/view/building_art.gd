@@ -9,7 +9,10 @@ extends RefCounted
 const RECIPES := {
 	"camp": [[["Tent", 0.95, 0.9, 1.45, 15], ["Cart", 2.25, 1.0, 1.3, -75], ["BonfireLit", 1.55, 2.25, 0.75, 0],
 		["CrateStack1", 2.5, 2.35, 0.55, 10], ["Bags", 0.55, 2.35, 0.6, -20], ["Barrel", 2.65, 0.35, 0.32, 0]]],
-	"house": [[["HousesSecondAge1Level1", 1.0, 0.95, 1.85, 0]], [["HousesSecondAge2Level1", 1.0, 0.95, 1.85, 0]],
+	# "type@N" is a building's look from era N on: settlement huts, then cottages
+	"house@0": [[["HousesFirstAge1Level2", 1.0, 0.95, 1.7, 0]], [["HousesFirstAge2Level3", 1.0, 0.95, 1.85, 0]],
+		[["HousesFirstAge3Level3", 1.0, 0.95, 1.8, 0]]],
+	"house@1": [[["HousesSecondAge1Level1", 1.0, 0.95, 1.85, 0]], [["HousesSecondAge2Level1", 1.0, 0.95, 1.85, 0]],
 		[["HousesFirstAge1Level3", 1.0, 0.95, 1.8, 0]]],
 	"stone_house": [[["HousesSecondAge3Level1", 1.0, 0.95, 1.85, 0]]],
 	"stockpile": [[["Fence", 0.75, 0.12, 1.3, 0], ["Fence", 2.25, 0.12, 1.3, 0], ["Fence", 0.12, 1.1, 1.3, 90],
@@ -58,8 +61,18 @@ static func variants(type: String) -> int:
 	return RECIPES.get(type, [[]]).size()
 
 
-## The merged mesh for one look of a building, or null if it has none.
-static func mesh(type: String, variant := 0) -> Mesh:
+## The recipe name for a building in an era: "type@era" if the era has its own look.
+static func recipe(type: String, era: int) -> String:
+	for e in range(era, -1, -1):
+		var k := "%s@%d" % [type, e]
+		if RECIPES.has(k):
+			return k
+	return type
+
+
+## The merged mesh for one look of a building in an era, or null if it has none.
+static func mesh(type: String, variant := 0, era := 9) -> Mesh:
+	type = recipe(type, era)
 	if not RECIPES.has(type):
 		return null
 	var vs: Array = RECIPES[type]

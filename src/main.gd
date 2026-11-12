@@ -180,6 +180,12 @@ func _demo(args: Array) -> void:
 			game.hud.show_person(game.selected_person)
 		"town":
 			game.hud.show_town(0)
+		"progress":
+			w.start_research("smithing")
+			w.run(Defs.MONTH_TICKS)
+			game.hud.show_progress()
+		"newera":
+			game.hud.show_new_era(1)
 		"stock":
 			game.hud.show_town(1)
 		"years":
