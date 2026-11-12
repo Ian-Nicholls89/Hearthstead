@@ -17,7 +17,7 @@ func _ready() -> void:
 	if shot >= 0:
 		for k in 20:
 			await get_tree().process_frame
-		await RenderingServer.frame_post_draw
+		await get_tree().process_frame
 		get_viewport().get_texture().get_image().save_png(args[shot + 1])
 		get_tree().quit()
 
@@ -166,6 +166,6 @@ func _demo(args: Array) -> void:
 			_show_menu()
 	for k in 25:
 		await get_tree().process_frame
-	await RenderingServer.frame_post_draw
+	await get_tree().process_frame
 	get_viewport().get_texture().get_image().save_png(out)
 	get_tree().quit()

@@ -171,29 +171,6 @@ static func tree(kind := 0) -> ArrayMesh:
 	return _cache[key]
 
 
-static func boulder() -> ArrayMesh:
-	if _cache.has("boulder"):
-		return _cache.boulder
-	var st := _begin()
-	cylinder(st, Vector3(0, -0.05, 0), 0.32, 0.22, STONE, 6, 0.22)
-	cone(st, Vector3(0, 0.17, 0), 0.22, 0.12, STONE.lightened(0.05), 6)
-	cylinder(st, Vector3(0.22, -0.05, 0.12), 0.15, 0.14, STONE_DARK, 5, 0.08)
-	_cache.boulder = _commit(st)
-	return _cache.boulder
-
-
-static func person() -> ArrayMesh:
-	if _cache.has("person"):
-		return _cache.person
-	var st := _begin()
-	var white := Color(1, 1, 1)
-	cylinder(st, Vector3.ZERO, 0.1, 0.3, white, 6, 0.07)   # body, tinted per job
-	box(st, Vector3(0, 0.37, 0), Vector3(0.13, 0.13, 0.13), Color(0.93, 0.78, 0.65))
-	box(st, Vector3(0, 0.45, 0), Vector3(0.14, 0.04, 0.14), Color(0.35, 0.25, 0.18))
-	_cache.person = _commit(st)
-	return _cache.person
-
-
 static func crate() -> ArrayMesh:
 	if _cache.has("crate"):
 		return _cache.crate

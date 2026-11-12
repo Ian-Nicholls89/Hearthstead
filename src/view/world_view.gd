@@ -20,14 +20,13 @@ var terrain_mat: ShaderMaterial
 var tree_mat: ShaderMaterial
 var thing_mat: ShaderMaterial
 var water_mat: StandardMaterial3D
-var trees: Array[MultiMeshInstance3D] = []
-var boulders: MultiMeshInstance3D
+var nature: NatureView
+var villagers := {}                 # citizen id -> Villager
+var anim_speed := 1.0               # set by the game: 0 when paused
 var marks: MultiMeshInstance3D
 var roads: MultiMeshInstance3D
 var soil: MultiMeshInstance3D
 var crops: MultiMeshInstance3D
-var people: MultiMeshInstance3D
-var loads: MultiMeshInstance3D
 var building_nodes := {}            # id -> Node3D
 var prev_pos := {}                  # citizen id -> Vector2 at the start of the last step
 var facing := {}
@@ -47,17 +46,13 @@ func setup(w: World) -> void:
 	thing_mat = Meshes.material().duplicate()
 	_build_terrain()
 	_build_water()
-	for kind in 2:
-		var mmi := _multimesh(Meshes.tree(kind), tree_mat, false)
-		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-		trees.append(mmi)
-	boulders = _multimesh(Meshes.boulder(), thing_mat, false)
+	nature = NatureView.new()
+	add_child(nature)
+	nature.setup(world, tree_mat)
 	marks = _multimesh(Meshes.crate(), _flat_material(Color(0.9, 0.2, 0.15)), false)
 	roads = _multimesh(Meshes.flat_tile(), _flat_material(ROAD), false)
 	soil = _multimesh(Meshes.flat_tile(), _flat_material(FIELD_SOIL), false)
 	crops = _multimesh(Meshes.crop(), thing_mat, true)
-	people = _multimesh(Meshes.person(), thing_mat, true)
-	loads = _multimesh(Meshes.crate(), thing_mat, true)
 	selection = MeshInstance3D.new()
 	var sm := StandardMaterial3D.new()
 	sm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -240,6 +235,7 @@ func update_view(alpha: float, delta: float) -> void:
 	if _field_timer <= 0.0:
 		_field_timer = 0.5
 		_draw_fields()
+	nature.update_view(delta)
 	_draw_people(alpha)
 	_season()
 
@@ -255,42 +251,28 @@ func _season() -> void:
 	var autumn := 0.0
 	if t >= 6.0 and t < 9.5:
 		autumn = clampf((t - 6.0) / 1.5, 0.0, 1.0) * clampf((9.5 - t) * 2.0, 0.0, 1.0)
-	terrain_mat.set_shader_parameter("snow", snow * 0.9)
+	if NatureView.season_of(world.month()) == 1:
+		autumn = maxf(autumn, 1.0)    # match the near trees, which switch for the season
+	terrain_mat.set_shader_parameter("snow", snow * 0.8)
 	tree_mat.set_shader_parameter("snow", snow * 0.7)
 	thing_mat.set_shader_parameter("snow", snow)
-	tree_mat.set_shader_parameter("leaf_tint", Color(0.8, 0.42, 0.12, autumn * 0.55))
+	tree_mat.set_shader_parameter("leaf_tint", Color(0.82, 0.42, 0.14, autumn * 0.8))
 	water_mat.albedo_color = Color(0.2, 0.42, 0.58, 0.8).lerp(Color(0.8, 0.88, 0.95, 0.95), snow * 0.8)
 
 
 func _draw_tiles() -> void:
-	var tree_t: Array[Array] = [[], []]
-	var boulder_t: Array[Transform3D] = []
 	var mark_t: Array[Transform3D] = []
 	var road_t: Array[Transform3D] = []
-	for i in world.feature.size():
-		var f := world.feature[i]
-		var x := i % world.width
-		var y := i / world.width
+	for i in world.road.size():
 		if world.road[i]:
-			road_t.append(Transform3D(Basis(), Vector3(x, 0.015, y)))
-		if f == Defs.Feature.TREE:
-			var h := _hash(i)
-			var s := 0.35 + world.growth[i] * 0.75 + h * 0.15
-			var b := Basis(Vector3.UP, h * TAU).scaled(Vector3(s, s * (0.9 + h * 0.3), s))
-			var p := Vector3(x + 0.3 + h * 0.4, 0, y + 0.3 + _hash(i + 1) * 0.4)
-			tree_t[0 if _hash(i + 5) < 0.6 else 1].append(Transform3D(b, p))
-			if world.mark[i]:
-				mark_t.append(Transform3D(Basis().scaled(Vector3(0.8, 0.8, 0.8)), p + Vector3(0, 1.4 * s, 0)))
-		elif f == Defs.Feature.BOULDER:
-			var h := _hash(i)
-			var b := Basis(Vector3.UP, h * TAU).scaled(Vector3.ONE * (0.8 + h * 0.5))
-			var p := Vector3(x + 0.5, 0, y + 0.5)
-			boulder_t.append(Transform3D(b, p))
-			if world.mark[i]:
-				mark_t.append(Transform3D(Basis().scaled(Vector3(0.8, 0.8, 0.8)), p + Vector3(0, 0.6, 0)))
-	for k in 2:
-		_fill(trees[k], tree_t[k])
-	_fill(boulders, boulder_t)
+			road_t.append(Transform3D(Basis(), Vector3(i % world.width, 0.015, i / world.width)))
+	for i in world.marked:
+		var x: int = i % world.width
+		var y: int = i / world.width
+		var hgt := 0.8
+		if world.feature[i] == Defs.Feature.TREE:
+			hgt = 0.6 + world.growth[i] * 2.0
+		mark_t.append(Transform3D(Basis().scaled(Vector3(0.8, 0.8, 0.8)), Vector3(x + 0.5, hgt, y + 0.5)))
 	_fill(marks, mark_t)
 	_fill(roads, road_t)
 
@@ -333,38 +315,88 @@ func _draw_fields() -> void:
 
 
 func _draw_people(alpha: float) -> void:
-	var mm := people.multimesh
-	var n := world.citizens.size()
-	if mm.instance_count < n:
-		mm.instance_count = n + 32
-		loads.multimesh.instance_count = n + 32
-	mm.visible_instance_count = n
-	var li := 0
-	var i := 0
+	for id in villagers.keys():
+		if not world.citizens.has(id):
+			villagers[id].queue_free()
+			villagers.erase(id)
 	for c in world.citizens.values():
+		var v: Villager = villagers.get(c.id)
+		if v == null:
+			v = Villager.create()
+			add_child(v)
+			villagers[c.id] = v
+		var job := world.job_name(c)
+		v.dress(job, not c.male, c.id * 7 % 3, c.id * 13 % 5)
+		var s := 1.0 if c.is_adult() else 0.55 + 0.45 * clampf(c.age / Defs.ADULT_AGE, 0.0, 1.0)
+		v.scale = Vector3(s, s, s)
 		var a: Vector2 = prev_pos.get(c.id, c.pos)
 		var p := a.lerp(c.pos, alpha)
-		var d: Vector2 = c.pos - a
-		if d.length_squared() > 0.00001:
-			facing[c.id] = atan2(d.x, d.y)
-		var s := 1.3 if c.is_adult() else 0.9
 		var y := 0.0
 		var t: Vector2i = c.tile()
 		if world.in_bounds(t) and world.terrain[world.idx(t)] == Defs.Terrain.FORD:
 			y = -0.12
-		var basis := Basis(Vector3.UP, facing.get(c.id, 0.0)).scaled(Vector3(s, s, s))
-		mm.set_instance_transform(i, Transform3D(basis, Vector3(p.x, y, p.y)))
-		var col: Color = JOB_COLORS.get(world.job_name(c), Color.WHITE)
-		if c.sick:
-			col = col.lerp(Color(0.5, 0.8, 0.3), 0.5)
-		mm.set_instance_color(i, col)
-		if c.carrying() > 0:
-			var res: String = c.carry.keys()[0]
-			loads.multimesh.set_instance_transform(li, Transform3D(Basis().scaled(Vector3(0.9, 0.9, 0.9)), Vector3(p.x, y + 0.5 * s, p.y)))
-			loads.multimesh.set_instance_color(li, Defs.RES[res].color)
-			li += 1
-		i += 1
-	loads.multimesh.visible_instance_count = li
+		v.position = Vector3(p.x, y, p.y)
+		var state := _state(c)
+		v.visible = state[0] != "inside"
+		if not v.visible:
+			continue
+		var d: Vector2 = c.pos - a
+		if d.length_squared() > 0.00001:
+			facing[c.id] = atan2(d.x, d.y)
+		elif state[1] != Vector2.INF:
+			var to: Vector2 = state[1] - c.pos
+			if to.length_squared() > 0.01:
+				facing[c.id] = atan2(to.x, to.y)
+		v.rotation.y = lerp_angle(v.rotation.y, facing.get(c.id, 0.0), 0.25)
+		var speed := anim_speed
+		if state[0] == "Jog_Fwd":
+			speed *= 1.7
+		v.play(state[0], speed)
+		var res := ""
+		for k in c.carry:
+			res = k
+		v.carry(Defs.RES[res].color if res != "" else Color(0, 0, 0, 0))
+
+
+## What a person looks like they are doing: [animation or "inside", spot they face].
+func _state(c: Citizen) -> Array:
+	if c.plan.is_empty():
+		return ["Idle", Vector2.INF]
+	var s: Dictionary = c.plan[0]
+	if s.t == "go":
+		return ["Jog_Fwd", Vector2.INF]
+	var at := Vector2.INF
+	if s.has("tile"):
+		at = Vector2(s.tile) + Vector2(0.5, 0.5)
+	var b: Building = world.buildings.get(s.get("b", -1))
+	if b and b.kind() != "field":
+		at = b.center()
+	match s.fx:
+		"eat_home", "put_home":
+			return ["inside", at]
+		"warm":
+			if b and b.kind() == "house":
+				return ["inside", at]
+			return ["Idle_Torch", at]
+		"gather":
+			if b and b.type == "hunter":
+				return ["Pistol_Aim_Neutral", at]
+			if b and b.type == "fisher":
+				return ["Idle_Torch", at]
+			return ["Fixing_Kneeling", at]
+		"plant", "plant_field", "harvest":
+			return ["Fixing_Kneeling", at]
+		"chop", "clear", "extract", "build":
+			return ["Sword_Attack", at]
+		"process":
+			return ["Interact" if b and b.type == "tailor" else "Sword_Attack", at]
+		"eat_store":
+			return ["Idle_Talking", at]
+		"idle":
+			if not c.is_adult():
+				return ["Dance" if c.id % 3 == 0 else "Idle", at]
+			return ["Idle_Talking" if c.id % 4 == 0 else "Idle", at]
+	return ["Interact", at]
 
 
 # --- buildings ---------------------------------------------------------------------
@@ -391,6 +423,8 @@ func _sync_buildings() -> void:
 			sc.mesh = Meshes.scaffold(b.size)
 			sc.material_override = thing_mat
 			node.add_child(sc)
+			if b.kind() == "house":
+				node.add_child(_smoke(Vector3(1.45 if b.type == "house" else 0.5, 1.6, 0.75)))
 			add_child(node)
 			building_nodes[b.id] = node
 	_update_sites()
@@ -412,6 +446,47 @@ func _update_sites() -> void:
 			body.scale = Vector3(1, maxf(0.03, f), 1)
 			sc.visible = true
 		_fire(node, b)
+		var smoke: CPUParticles3D = node.get_node_or_null("Smoke")
+		if smoke:
+			# a fire in the hearth when someone is home and it is cold, or at mealtimes
+			var cold: bool = Defs.MONTH_TEMP[world.month()] < Defs.COLD_BELOW + 4
+			smoke.emitting = b.built and not b.residents.is_empty() and b.warm and (cold or (b.id + world.tick / 200) % 3 == 0)
+
+
+func _smoke(at: Vector3) -> CPUParticles3D:
+	var p := CPUParticles3D.new()
+	p.name = "Smoke"
+	p.amount = 8
+	p.lifetime = 3.5
+	p.position = at
+	p.direction = Vector3(0.2, 1, 0)
+	p.spread = 12
+	p.gravity = Vector3(0.12, 0.25, 0)
+	p.initial_velocity_min = 0.15
+	p.initial_velocity_max = 0.3
+	p.scale_amount_min = 0.25
+	p.scale_amount_max = 0.4
+	var curve := Curve.new()
+	curve.add_point(Vector2(0, 0.4))
+	curve.add_point(Vector2(1, 1.6))
+	p.scale_amount_curve = curve
+	var grad := Gradient.new()
+	grad.set_color(0, Color(0.8, 0.8, 0.82, 0.55))
+	grad.set_color(1, Color(0.85, 0.85, 0.88, 0.0))
+	p.color_ramp = grad
+	var sm := SphereMesh.new()
+	sm.radial_segments = 6
+	sm.rings = 3
+	sm.radius = 0.25
+	sm.height = 0.5
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.vertex_color_use_as_albedo = true
+	sm.material = m
+	p.mesh = sm
+	p.emitting = false
+	return p
 
 
 func _fire(node: Node3D, b: Building) -> void:

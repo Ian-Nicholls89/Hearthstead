@@ -126,6 +126,7 @@ func _process(delta: float) -> void:
 		_acc = 0.0 if done < n else _acc - n
 		if world.game_over:
 			hud.show_game_over()
+	view.anim_speed = 0.0 if speed() == 0 or hud.modal_open() else minf(float(speed()), 3.0)
 	view.update_view(clampf(_acc, 0.0, 1.0), delta)
 	_lighting()
 	var season := Defs.season_index(world.month())

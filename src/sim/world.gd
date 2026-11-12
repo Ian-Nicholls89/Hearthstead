@@ -55,6 +55,8 @@ var history: Array = []              # one entry per month
 var game_over := false
 var born_total := 0
 var died_total := 0
+const CHUNK := 16                    # the view redraws the map in chunks this size
+var dirty_chunks := {}               # chunk index -> true, for the view
 var revision := 0                    # bumped when tiles change, so the view knows to redraw
 var building_revision := 0
 
@@ -122,6 +124,7 @@ func _setup_astar() -> void:
 
 
 func _refresh_tile(t: Vector2i) -> void:
+	dirty_chunks[(t.y / CHUNK) * ceili(float(width) / CHUNK) + t.x / CHUNK] = true
 	var i := idx(t)
 	var ter := terrain[i]
 	var solid := ter == Defs.Terrain.WATER or ter == Defs.Terrain.ROCK

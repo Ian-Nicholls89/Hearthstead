@@ -15,7 +15,7 @@ void fragment() {
 	vec3 c = COLOR.rgb;
 	float leaf = clamp((c.g - max(c.r, c.b)) * 6.0, 0.0, 1.0);
 	c = mix(c, leaf_tint.rgb * (0.6 + c.g), leaf * leaf_tint.a);
-	c = mix(c, vec3(0.92, 0.94, 0.98), snow * smoothstep(0.45, 0.85, up));
+	c = mix(c, vec3(0.83, 0.86, 0.91), snow * smoothstep(0.45, 0.85, up));
 	ALBEDO = c;
 	ROUGHNESS = 0.95;
 }
