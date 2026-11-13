@@ -62,6 +62,12 @@ var research := {}                   # tech id -> knowledge put in so far
 var knowledge := 0.0                 # gathered while nothing is being researched
 var winters := 0                     # winters the town has come through
 var traded := 0                      # value of goods given to merchants
+var climate := 0.0                   # 0..100; at 100 the civilisation collapses
+var climate_peak := 0.0
+var ending := ""                     # "", "lost", "climate" (later "space", "harmony")
+var era_ticks: Array = [0]           # tick each era began
+var peak_pop := 0
+var tree_count := 0
 var sandbox := false                 # everything unlocked (tests, debugging)
 var _mods := {}
 var born_total := 0
@@ -82,6 +88,7 @@ func new_game(p_seed: int, p_difficulty := 1, size := 96) -> void:
 	rng.seed = map_seed * 7919 + 13
 	MapGen.generate(self)
 	_setup_astar()
+	count_trees()
 	var c := Vector2i(width / 2, height / 2)
 	var camp := place("camp", c - Vector2i(1, 1), true)
 	var cb: Building = buildings[camp]
@@ -271,6 +278,15 @@ func can_place(type: String, pos: Vector2i) -> String:
 		return "Build it on grey stone ground"
 	if d.get("needs") == "iron_dep" and need_dep < s.x * s.y / 2:
 		return "Build it on rust-red iron ground"
+	if d.get("needs") == "mountain":
+		var near := false
+		for y in range(-2, s.y + 2):
+			for x in range(-2, s.x + 2):
+				var t := pos + Vector2i(x, y)
+				if in_bounds(t) and terrain[idx(t)] == Defs.Terrain.ROCK:
+					near = true
+		if not near:
+			return "Build it at the foot of the mountains"
 	if d.get("needs") == "water":
 		for y in range(-1, s.y + 1):
 			for x in range(-1, s.x + 1):
@@ -594,7 +610,10 @@ func abs_month() -> int:
 
 
 func temperature() -> float:
-	return Defs.temp_of(tick)
+	var t := Defs.temp_of(tick)
+	if t < Defs.COLD_BELOW and climate > 30.0:
+		t -= (climate - 30.0) / 14.0       # a wrecked climate means bitter winters
+	return t
 
 
 func step() -> void:
@@ -715,6 +734,13 @@ func _markets() -> void:
 				h.inv["firewood"] = wood + _take_anywhere("firewood", int((Defs.HOME_WOOD_MAX / 2 - wood) * share))
 
 
+func _staffed(type: String) -> bool:
+	for b in buildings.values():
+		if b.type == type and b.built and not b.workers.is_empty():
+			return true
+	return false
+
+
 func _take_anywhere(res: String, n: int) -> int:
 	var got := 0
 	for s in storages():
@@ -757,6 +783,10 @@ func job_name(c: Citizen) -> String:
 		"harbour": return "Fisher"
 		"glassworks": return "Glassblower"
 		"university": return "Scholar"
+		"coal_mine": return "Coal miner"
+		"brickworks", "steelworks", "factory", "textile_mill": return "Factory hand"
+		"station": return "Railwayman"
+		"hospital": return "Doctor"
 	return "Worker"
 
 
@@ -765,6 +795,8 @@ func job_name(c: Citizen) -> String:
 func _monthly() -> void:
 	var m := month()
 	_progress_month()
+	_climate_month()
+	peak_pop = maxi(peak_pop, citizens.size())
 	_ageing()
 	_births()
 	_housing()
@@ -791,9 +823,74 @@ func _monthly() -> void:
 		"adults": citizens.values().filter(func(c): return c.is_adult()).size()})
 	if history.size() > 600:
 		history.pop_front()
-	if citizens.is_empty():
+	if citizens.is_empty() and not game_over:
 		game_over = true
+		ending = "lost"
 		say("The last of your people is gone.", "death")
+
+
+## Industry puts smoke in the sky; forests take it back out. Past 30 winters bite
+## harder, past 40 harvests fail, past 50 storms come, and at 100 it is over.
+func _climate_month() -> void:
+	var emit := 0.0
+	for b in buildings.values():
+		var e := float(b.def().get("emit", 0.0))
+		if e > 0.0 and b.built and b.max_workers() > 0:
+			emit += e * float(b.workers.size()) / b.max_workers()
+	emit *= mod("emission")
+	var absorb := 0.03 + tree_count / 4000.0 * 0.12 * mod("absorb")
+	climate = clampf(climate + emit - absorb, 0.0, 100.0)
+	climate_peak = maxf(climate_peak, climate)
+	for level in [25, 50, 75, 90]:
+		if climate >= level and _climate_warned < level:
+			_climate_warned = level
+			var text := {25: "The air is thick with smoke. The climate is starting to change.",
+				50: "Winters are harsher and harvests poorer. The climate is in danger.",
+				75: "Storms batter the town. The climate is close to breaking.",
+				90: "The climate is on the edge of collapse!"}
+			say(text[level], "bad")
+	if climate > 50.0 and rng.randf() < (climate - 50.0) / 250.0:
+		var hit: Array = buildings.values().filter(func(b): return b.built and b.fire == 0 and b.kind() in ["house", "gather", "process", "extract"])
+		if not hit.is_empty():
+			var b: Building = hit[rng.randi() % hit.size()]
+			b.fire = 120
+			say("A violent storm set the %s alight." % b.title().to_lower(), "bad")
+	if climate >= 100.0 and not game_over:
+		game_over = true
+		ending = "climate"
+		say("The climate has collapsed. Your civilisation cannot go on.", "death")
+
+
+var _climate_warned := 0
+
+
+func count_trees() -> void:
+	tree_count = 0
+	for i in feature.size():
+		if feature[i] == Defs.Feature.TREE:
+			tree_count += 1
+
+
+## The civilisation's story, for the ending screen.
+func story() -> Array:
+	var out: Array = []
+	var years := Defs.year_of(tick)
+	out.append("Your people lasted %d year%s and reached the %s era." % [years, "" if years == 1 else "s", Progress.ERAS[era].name])
+	for e in range(1, era_ticks.size()):
+		out.append("  %s: year %d" % [Progress.ERAS[e].name, Defs.year_of(era_ticks[e])])
+	var branches := {}
+	for id in techs:
+		var br: String = Progress.TECHS[id].branch
+		branches[br] = branches.get(br, 0) + 1
+	if not branches.is_empty():
+		var top: String = branches.keys().reduce(func(a, b): return a if branches[a] >= branches[b] else b)
+		var lean := {"Food": "feeding its people", "Industry": "industry and making", "Society": "learning and wellbeing"}
+		out.append("It made %d discover%s and leaned towards %s." % [techs.size(), "y" if techs.size() == 1 else "ies", lean[top]])
+	out.append("At its height it held %d people. %d were born and %d died." % [peak_pop, born_total, died_total])
+	if era >= 4 or climate_peak > 0.0:
+		var planet := "kept the planet healthy" if climate_peak < 30 else ("strained the planet" if climate_peak < 75 else "brought the planet to the brink")
+		out.append("It %s (climate at worst %d%%)." % [planet, int(climate_peak)])
+	return out
 
 
 func _ageing() -> void:
@@ -954,13 +1051,15 @@ func _illness() -> void:
 		if c.sick:
 			var h: Building = buildings.get(c.home)
 			var chance := 0.4
-			if h and h.inv.get("herbs", 0) > 0:
+			if _staffed("hospital"):
+				chance = 0.95
+			elif h and h.inv.get("herbs", 0) > 0:
 				h.inv["herbs"] -= 1
 				chance = minf(0.98, 0.85 * mod("cure"))
 			if rng.randf() < chance:
 				c.sick = false
 			continue
-		var p := 0.003
+		var p := 0.003 * (0.6 if _staffed("hospital") else 1.0)
 		if variety(c, now) < 2:
 			p += 0.01
 		if c.home < 0:
@@ -1026,7 +1125,7 @@ func _trees() -> void:
 	for i in feature.size():
 		if feature[i] != Defs.Feature.TREE:
 			continue
-		growth[i] = minf(1.0, growth[i] + Defs.TREE_GROW * Defs.MONTH_TICKS * months)
+		growth[i] = minf(1.0, growth[i] + Defs.TREE_GROW * Defs.MONTH_TICKS * months * mod("tree_growth"))
 		if growth[i] >= Defs.TREE_GROWN and rng.randf() < 0.01:
 			spread.append(i)
 	for i in spread:
@@ -1040,6 +1139,7 @@ func _trees() -> void:
 	for i in feature.size():
 		if feature[i] == Defs.Feature.TREE:
 			_refresh_tile(tile_of(i))
+	count_trees()
 	revision += 1
 
 
@@ -1051,7 +1151,7 @@ func _grow_fields(dt: int) -> void:
 			continue
 		for i in b.field.size():
 			if b.field[i] >= 0.0 and b.field[i] < 1.0 and growing:
-				var rate := Defs.CROP_GROW * (1.15 if b.crop == "beans" else 1.0)
+				var rate := Defs.CROP_GROW * (1.15 if b.crop == "beans" else 1.0) * (1.0 - clampf((climate - 40.0) / 100.0, 0.0, 0.5))
 				b.field[i] = minf(1.0, b.field[i] + rate * dt)
 
 
@@ -1139,9 +1239,10 @@ func _nomads() -> void:
 	for b in buildings.values():
 		if b.type == "town_hall" and b.built:
 			hall = true
-	if not hall or rng.randf() > 0.6:
+	var station := _staffed("station")
+	if not (hall or station) or rng.randf() > (0.9 if station else 0.6):
 		return
-	pending_nomads = rng.randi_range(4, 9)
+	pending_nomads = rng.randi_range(6, 12) if station else rng.randi_range(4, 9)
 	say("%d nomads ask to join your town." % pending_nomads, "info")
 	nomads_arrived.emit(pending_nomads)
 
@@ -1337,6 +1438,7 @@ func _progress_month() -> void:
 	var ms := milestones()
 	if not ms.is_empty() and ms.all(func(m): return m.have >= m.need):
 		era += 1
+		era_ticks.append(tick)
 		say("A new era begins: %s. %s" % [Progress.ERAS[era].name, Progress.ERAS[era].desc], "good")
 		era_changed.emit(era)
 		building_revision += 1

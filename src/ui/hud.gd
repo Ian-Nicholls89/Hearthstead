@@ -8,7 +8,7 @@ const CREAM := Color(0.96, 0.91, 0.8)
 const DIM := Color(0.75, 0.7, 0.6)
 const GOOD := Color(0.55, 0.85, 0.45)
 const BAD := Color(1.0, 0.5, 0.4)
-const CHIPS := ["food", "firewood", "logs", "stone", "iron", "tools", "coats"]
+const CHIPS := ["food", "firewood", "logs", "stone", "iron", "tools", "coats", "climate"]
 
 var game: Game
 var world: World
@@ -150,13 +150,13 @@ func _top_bar() -> void:
 	var h := HBoxContainer.new()
 	left.add_child(h)
 	h.add_child(btn("Menu", show_pause, 0))
-	date_label = label("", 20)
-	date_label.custom_minimum_size = Vector2(200, 0)
+	date_label = label("", 19)
+	date_label.custom_minimum_size = Vector2(178, 0)
 	date_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	h.add_child(date_label)
 	for i in Game.SPEEDS.size():
 		var t := "II" if i == 0 else "%dx" % Game.SPEEDS[i]
-		var b := btn(t, func(): game.set_speed(i), 52)
+		var b := btn(t, func(): game.set_speed(i), 48)
 		b.toggle_mode = true
 		speed_buttons.append(b)
 		h.add_child(b)
@@ -174,7 +174,7 @@ func _top_bar() -> void:
 	pop_label = label("", 22)
 	pop_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pb.add_child(pop_label)
-	pb.custom_minimum_size = Vector2(80, 56)
+	pb.custom_minimum_size = Vector2(70, 56)
 	pop_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	pop_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	pop_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -184,13 +184,14 @@ func _top_bar() -> void:
 		chip.flat = true
 		chip.focus_mode = Control.FOCUS_NONE
 		chip.pressed.connect(func(): show_town(1))
-		chip.custom_minimum_size = Vector2(66, 56)
+		chip.custom_minimum_size = Vector2(56, 56)
+		chip.set_meta("chip", k)
 		var v := VBoxContainer.new()
 		v.add_theme_constant_override("separation", 0)
 		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		v.set_anchors_preset(Control.PRESET_FULL_RECT)
-		var name: String = "Food" if k == "food" else Defs.RES[k].name
-		var col: Color = Defs.RES[k].color if k != "food" else Color(0.85, 0.65, 0.35)
+		var name: String = {"food": "Food", "climate": "Climate"}.get(k, Defs.RES.get(k, {}).get("name", k))
+		var col: Color = {"food": Color(0.85, 0.65, 0.35), "climate": Color(0.6, 0.8, 0.6)}.get(k, Defs.RES.get(k, {}).get("color", CREAM))
 		var t := label(name, 15, col.lightened(0.25))
 		t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		t.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -332,6 +333,13 @@ func refresh() -> void:
 	pop_label.text = "People\n%d" % p.total
 	pop_label.add_theme_font_size_override("font_size", 19)
 	for k in CHIPS:
+		if k == "climate":
+			# the gauge appears with industry
+			var show := world.era >= 4 or world.climate > 0.5
+			chip_labels[k].get_parent().get_parent().visible = show
+			chip_labels[k].text = "%d%%" % int(world.climate)
+			chip_labels[k].add_theme_color_override("font_color", GOOD if world.climate < 30 else (Color(1, 0.8, 0.4) if world.climate < 60 else BAD))
+			continue
 		var n := world.food_total() if k == "food" else world.stock(k)
 		chip_labels[k].text = _short(n)
 		var low := false
@@ -671,12 +679,26 @@ func ask_nomads(n: int) -> void:
 	v.add_child(h)
 
 
+const ENDINGS := {
+	"lost": ["Hearthstead is empty", "Hunger, cold and sickness took the last of your people."],
+	"climate": ["Climate collapse", "The smoke of your industry broke the climate. Storms, floods and failed harvests did the rest."],
+	"space": ["To the stars", "Your people built the Starport and left to settle new worlds."],
+	"harmony": ["Harmony", "Your people built a world in balance, healthy and content."],
+}
+
+
 func show_game_over() -> void:
 	if modal != null and is_instance_valid(modal) and modal.get_meta("over", false):
 		return
-	var v := _modal("Hearthstead is empty", true, false)
+	var e: Array = ENDINGS.get(world.ending, ENDINGS["lost"])
+	var v := _modal(e[0], true, false, 760)
 	modal.set_meta("over", true)
-	_text(v, "Your town lasted until %s. %d were born and %d died." % [Defs.date_text(world.tick), world.born_total, world.died_total])
+	_text(v, e[1])
+	for line in world.story():
+		var l := label(line, 19, DIM if line.begins_with("  ") else CREAM)
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.custom_minimum_size = Vector2(700, 0)
+		v.add_child(l)
 	SaveGame.delete()
 	v.add_child(btn("Back to the menu", func(): game.exit_to_menu.emit()))
 
@@ -842,6 +864,11 @@ func show_progress() -> void:
 	elif world.knowledge >= 1.0:
 		line += " %d banked - choose a tech below." % int(world.knowledge)
 	body.add_child(label(line, 20))
+	if world.era >= 4 or world.climate > 0.5:
+		var cl := label("Climate: %d%%. Industry raises it; forests and cleaner techs bring it down. At 100%% the civilisation collapses." % int(world.climate), 19,
+			GOOD if world.climate < 30 else (Color(1, 0.8, 0.4) if world.climate < 60 else BAD))
+		cl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		body.add_child(cl)
 	for e in range(0, mini(world.era + 2, Progress.ERAS.size())):
 		var ids: Array = Progress.TECHS.keys().filter(func(id): return int(Progress.TECHS[id].era) == e)
 		if ids.is_empty():
@@ -903,7 +930,8 @@ func show_new_era(e: int) -> void:
 		_text(v, "New to research: " + ", ".join(new_techs.map(func(id): return Progress.TECHS[id].name)) + ".", DIM, 19)
 	var rebuilt := {1: "Your huts are being rebuilt as timber-framed houses.",
 		2: "Your houses are being rebuilt taller, on stone footings.",
-		3: "Your town grows grander: bigger homes, a stone church."}
+		3: "Your town grows grander: bigger homes, a stone church.",
+		4: "The town turns to brick and slate. Watch the smoke: the climate meter has appeared."}
 	if rebuilt.has(e):
 		_text(v, rebuilt[e], DIM, 19)
 	var h := HBoxContainer.new()

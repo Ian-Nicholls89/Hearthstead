@@ -114,6 +114,8 @@ func _demo(args: Array) -> void:
 	for a in args:
 		if a.begins_with("era="):
 			w.era = int(a.substr(4))
+		if a.begins_with("climate="):
+			w.climate = float(a.substr(8))
 	if "showcase" in args:
 		w.unlock_all()
 		# one of every building near the camp, finished, with stores to show
@@ -193,6 +195,13 @@ func _demo(args: Array) -> void:
 			game.hud.show_progress()
 		"newera":
 			game.hud.show_new_era(1)
+		"ending":
+			w.ending = "climate"
+			w.era_ticks = [0, 4000, 9000, 16000, 26000]
+			w.era = 4
+			w.climate_peak = 100.0
+			w.peak_pop = 214
+			game.hud.show_game_over()
 		"stock":
 			game.hud.show_town(1)
 		"years":

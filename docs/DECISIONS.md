@@ -54,3 +54,10 @@
   the sim cheap. Era looks: `house@2` (taller cottages on stone). The autoplayer now
   puts spare hands where the town is shortest; long games (15+ years) still show it
   stalling around 25-30 people with the wood economy tight - balance is stage v1.0.
+- **0.7 Industrial revolution and climate.** Climate is one 0..100 number: industrial
+  buildings carry an `emit` rate scaled by how staffed they are, forests absorb by tree
+  count, techs scale both. Effects are deliberately simple (colder winters, slower
+  crops, storm fires, water level and haze in the view); 100 ends the game. Endings
+  share one screen (`Hud.ENDINGS`) fed by `World.story()`. The heavy city models
+  (5-40k triangles) are used only for one-off buildings; brick terraces and the
+  era's houses are the cottages recoloured (`BuildingArt.tinted`).

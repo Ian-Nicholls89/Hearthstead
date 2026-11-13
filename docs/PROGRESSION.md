@@ -77,10 +77,20 @@ Glassmaking, costs glass), Banking (your goods are worth 25% more to merchants),
 Aqueducts (fountain squares; illness 30% rarer), Theatre (a big lift for homes around
 it). Milestones on: 120 people, a university, 1500 worth of goods traded, 6 techs.
 
-### 5 Industrial revolution
-Coal mining, steam engines and factories, brickworks and brick terraces, steelworks,
-railway, textile mills, sanitation and hospitals; reforestation and efficiency as the
-cleaner paths.
+### 5 Industrial revolution (in the game)
+Coal mining (coal mines at the foot of the mountains), Brickmaking (brickworks; brick
+terraces for eight), Steelmaking (steelworks), Steam power (steam factories: tools
+from steel), Textile mills (coats from wool by the hundred), Railways (stations:
+merchants by train and new families every spring), Sanitation (hospitals: illness
+rare and nearly always cured), Fertiliser (+25% harvests), Mechanised farming (farm
+work twice as fast), and the clean choices Forestry science (forests absorb 80% more,
+trees grow faster) and Efficient engines (industry 40% less smoke). New goods: coal,
+bricks, steel. Milestones on to the City: 200 people, 5000 coal, a station, 6 techs.
+
+The climate meter is live: industrial buildings add to it by how staffed they are,
+forests take it back out. Past 30% winters bite harder, past 40% harvests fail, past
+50% storms set buildings alight, the water rises up the banks and the sky hazes; at
+100% the game ends in climate collapse. Every ending shows the civilisation's story.
 
 ### 6 City
 Electricity and power stations (coal or hydro), trams, apartments, modern medicine,
@@ -100,7 +110,7 @@ climate repair, the space programme and the Starport.
    (done).
 2. **v0.5** - Small town (done).
 3. **v0.6** - Large town (done).
-4. **v0.7** - Industrial revolution and the climate meter.
+4. **v0.7** - Industrial revolution and the climate meter (done).
 5. **v0.8** - City (electricity network).
 6. **v0.9** - Modern.
 7. **v1.0** - Utopia, the endings and the civilisation story; balance across a whole game.

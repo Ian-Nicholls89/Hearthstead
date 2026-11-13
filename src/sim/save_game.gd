@@ -24,7 +24,8 @@ static func to_dict(w: World) -> Dictionary:
 		"buildings": bs, "citizens": cs, "merchant": w.merchant, "pending_nomads": w.pending_nomads,
 		"log": w.events_log, "era": w.era, "techs": w.techs.keys(), "researching": w.researching,
 		"research": w.research, "knowledge": w.knowledge, "winters": w.winters,
-		"traded": w.traded, "history": w.history, "born": w.born_total, "died": w.died_total,
+		"traded": w.traded, "climate": w.climate, "climate_peak": w.climate_peak, "ending": w.ending,
+		"era_ticks": w.era_ticks, "peak_pop": w.peak_pop, "history": w.history, "born": w.born_total, "died": w.died_total,
 	}
 
 
@@ -82,6 +83,12 @@ static func from_dict(d: Dictionary) -> World:
 	w.knowledge = float(d.get("knowledge", 0.0))
 	w.winters = int(d.get("winters", 0))
 	w.traded = int(d.get("traded", 0))
+	w.climate = float(d.get("climate", 0.0))
+	w.climate_peak = float(d.get("climate_peak", 0.0))
+	w.ending = d.get("ending", "")
+	w.era_ticks = d.get("era_ticks", [0]).map(func(t): return int(t))
+	w.peak_pop = int(d.get("peak_pop", 0))
+	w.count_trees()
 	if not d.has("era"):
 		# a town saved before progression: keep the techs for what it already built
 		for b in w.buildings.values():

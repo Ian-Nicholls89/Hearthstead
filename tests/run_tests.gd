@@ -507,3 +507,75 @@ func test_harbour_needs_water_and_fishes() -> void:
 	w.place("harbour", spot, true)
 	w.run(Defs.MONTH_TICKS * 2)
 	check(w.made.get("fish", 0) > 60, "harbour fish (%d)" % w.made.get("fish", 0))
+
+
+# --- industrial revolution and climate --------------------------------------------------
+
+func test_coal_mine_by_the_mountains() -> void:
+	var w := world(1)
+	var cb := camp(w)
+	check(w.can_place("coal_mine", AutoPlay.find_spot(w, "house")) != "", "not out in the meadow")
+	var spot := AutoPlay.find_spot(w, "coal_mine")
+	check(spot.x >= 0 and w.can_place("coal_mine", spot) == "", "a spot at the foot of the mountains")
+	w.place("coal_mine", spot, true)
+	w.run(Defs.MONTH_TICKS * 3)
+	check(w.made.get("coal", 0) > 40, "coal dug (%d)" % w.made.get("coal", 0))
+
+
+func test_steel_and_factory_chain() -> void:
+	var w := world(1)
+	var cb := camp(w)
+	w.store_add(cb, "coal", 200)
+	w.store_add(cb, "iron", 200)
+	w.place("steelworks", AutoPlay.find_spot(w, "steelworks"), true)
+	w.place("factory", AutoPlay.find_spot(w, "factory"), true)
+	w.run(Defs.MONTH_TICKS * 3)
+	check(w.made.get("steel", 0) > 20, "steel made (%d)" % w.made.get("steel", 0))
+	check(w.made.get("tools", 0) > 20, "factory tools (%d)" % w.made.get("tools", 0))
+
+
+func test_industry_heats_the_climate_and_forests_cool_it() -> void:
+	var w := world(1)
+	var cb := camp(w)
+	w.store_add(cb, "stone", 400)
+	w.store_add(cb, "coal", 400)
+	for i in 3:
+		w.place("brickworks", AutoPlay.find_spot(w, "brickworks"), true)
+	w.run(Defs.MONTH_TICKS * 6)
+	check(w.climate > 0.3, "smoke builds up (%.2f)" % w.climate)
+	var dirty := w.climate
+	for b in w.buildings.values():
+		if b.type == "brickworks":
+			w.set_wanted(b.id, 0)
+	w.run(Defs.MONTH_TICKS * 6)
+	check(w.climate < dirty, "forests bring it back down (%.2f -> %.2f)" % [dirty, w.climate])
+
+
+func test_climate_collapse_ends_the_game() -> void:
+	var w := world(1)
+	w.climate = 99.9
+	w.place("steelworks", AutoPlay.find_spot(w, "steelworks"), true)
+	w.store_add(camp(w), "coal", 100)
+	w.store_add(camp(w), "iron", 100)
+	w.run(Defs.MONTH_TICKS * 2)
+	check(w.game_over and w.ending == "climate", "climate collapse ending (%s)" % w.ending)
+	var story := w.story()
+	check(story.size() >= 3 and str(story).contains("planet"), "the story tells of the planet: %s" % str(story))
+
+
+func test_harsh_climate_bites() -> void:
+	var w := world(1)
+	w.tick = Defs.MONTH_TICKS * 10 + 1
+	var calm := w.temperature()
+	w.climate = 80.0
+	check(w.temperature() < calm - 2.0, "winters colder (%.1f vs %.1f)" % [w.temperature(), calm])
+
+
+func test_terraces_house_eight_and_climate_saves() -> void:
+	var w := world(1)
+	var id := w.place("terrace", AutoPlay.find_spot(w, "terrace"), true)
+	check(int(w.buildings[id].def().residents) == 8, "eight to a terrace")
+	w.climate = 42.5
+	w.era_ticks = [0, 4000]
+	var w2 := SaveGame.from_dict(JSON.parse_string(JSON.stringify(SaveGame.to_dict(w))))
+	check(is_equal_approx(w2.climate, 42.5) and w2.era_ticks == [0, 4000], "climate and era dates kept")

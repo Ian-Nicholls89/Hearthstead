@@ -8,7 +8,7 @@ const FOOD_ROTA := ["gatherer", "hunter", "field", "fisher", "field", "gatherer"
 const EXTRAS := ["barn", "stockpile", "tailor", "herbalist", "mine", "blacksmith", "well", "town_hall",
 	"chapel", "stone_house", "trading_post", "well", "barn", "windmill", "bakery", "school", "market", "orchard",
 	"stone_house", "pasture", "weaver", "tavern", "stone_house", "glassworks", "university", "plaza", "harbour",
-	"theatre"]
+	"theatre", "coal_mine", "brickworks", "terrace", "steelworks", "station", "hospital", "factory", "textile_mill"]
 
 var food_i := 0
 var extra_i := 0
@@ -18,7 +18,9 @@ var extra_i := 0
 const RESEARCH := ["agriculture", "stonework", "hide_working", "fishing", "herb_lore", "smithing", "crop_rotation",
 	"better_tools", "trade", "masonry", "medicine", "husbandry", "town_planning", "milling", "baking", "schooling",
 	"markets", "faith", "orchards", "shepherding", "weaving", "brewing", "paving", "glassmaking", "university",
-	"printing", "granaries", "guilds", "harbours", "irrigation", "aqueducts", "banking", "theatre"]
+	"printing", "granaries", "guilds", "harbours", "irrigation", "aqueducts", "banking", "theatre", "forestry",
+	"coal_mining", "brickmaking", "steelmaking", "railways", "sanitation", "efficient_engines", "steam_power",
+	"fertiliser", "textile_mills", "mechanised_farming"]
 
 
 func act(w: World) -> void:

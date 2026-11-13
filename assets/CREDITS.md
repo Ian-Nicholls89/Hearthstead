@@ -12,7 +12,9 @@ All CC0 1.0 (public domain); no attribution required, but credit where it's due.
   fence, hay, bags, inn, cauldron), **Survival** (tent), **Ultimate Crops** (lettuce,
   apple trees), **Farm Buildings** (fences) and **Farm Animals** (sheep). The Large town
   uses more of Ultimate Fantasy RTS (university hall, glassworks tower, harbour,
-  fountain square, theatre, stone church, bigger houses).
+  fountain square, theatre, stone church, bigger houses). The Industrial revolution uses
+  Quaternius's **Buildings** pack (station, hospital, factory, mills) and **Modular
+  Train** (locomotive, coal wagons, track); brick terraces are recoloured cottages.
 - Both come from the OpenUSD copies in https://github.com/chibifire-stages/quaternius-stage
   (commit ed5dc51) and are rebuilt with `tools/build_assets.sh` (`tools/usd2json.py`
   then `tools/build_assets.gd`). `tests/gallery.gd` renders them all for checking.

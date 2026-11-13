@@ -150,6 +150,10 @@ func _lighting() -> void:
 	sun.light_color = Color(0.85, 0.9, 1.0).lerp(Color(1.0, 0.95, 0.85), summer)
 	sun.light_energy = 0.75 + 0.25 * summer
 	env.background_color = Color(0.68, 0.74, 0.8).lerp(Color(0.55, 0.72, 0.88), summer)
+	# smoke in the sky as the climate turns
+	var haze := clampf(world.climate / 80.0, 0.0, 1.0)
+	env.background_color = env.background_color.lerp(Color(0.58, 0.55, 0.5), haze * 0.7)
+	env.fog_density = 0.004 + haze * 0.008
 	env.fog_light_color = env.background_color
 
 

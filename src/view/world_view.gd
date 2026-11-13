@@ -20,6 +20,7 @@ var terrain_mat: ShaderMaterial
 var tree_mat: ShaderMaterial
 var thing_mat: ShaderMaterial
 var water_mat: ShaderMaterial
+var water_node: MeshInstance3D
 var nature: NatureView
 var villagers := {}                 # citizen id -> Villager
 var anim_speed := 1.0               # set by the game: 0 when paused
@@ -217,6 +218,7 @@ func _build_water() -> void:
 	mi.material_override = water_mat
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mi)
+	water_node = mi
 
 
 ## How far each water tile is from dry land, 0 at the bank to 1 at 5+ tiles.
@@ -301,6 +303,8 @@ func _season() -> void:
 	thing_mat.set_shader_parameter("snow", snow)
 	nature.mat.set_shader_parameter("snow", snow * 0.8)
 	water_mat.set_shader_parameter("ice", clampf((snow - 0.3) / 0.6, 0.0, 1.0))
+	# a breaking climate: the water creeps up the banks
+	water_node.position.y = -0.08 + clampf((world.climate - 30.0) / 70.0, 0.0, 1.0) * 0.13
 	tree_mat.set_shader_parameter("leaf_tint", Color(0.82, 0.42, 0.14, autumn * 0.8))
 
 
@@ -500,6 +504,10 @@ func _sync_buildings() -> void:
 			if b.kind() == "house":
 				var top := mi.mesh.get_aabb().end.y
 				node.add_child(_smoke(Vector3(1.3, top * 0.92, 0.75)))
+			elif float(b.def().get("emit", 0.0)) > 0.0:
+				var top := mi.mesh.get_aabb().end.y
+				var s := _smoke(Vector3(b.size.x * 0.6, top * 0.95, b.size.y * 0.4), true)
+				node.add_child(s)
 			add_child(node)
 			building_nodes[b.id] = node
 	_update_sites()
@@ -526,7 +534,10 @@ func _update_sites() -> void:
 		if smoke:
 			# a fire in the hearth when someone is home and it is cold, or at mealtimes
 			var cold: bool = Defs.MONTH_TEMP[world.month()] < Defs.COLD_BELOW + 4
-			smoke.emitting = b.built and not b.residents.is_empty() and b.warm and (cold or (b.id + world.tick / 200) % 3 == 0)
+			if b.kind() == "house":
+				smoke.emitting = b.built and not b.residents.is_empty() and b.warm and (cold or (b.id + world.tick / 200) % 3 == 0)
+			else:
+				smoke.emitting = b.built and not b.workers.is_empty()
 
 
 ## Stockpiles show their logs, stone and crates; workplaces show what waits to be
@@ -569,10 +580,10 @@ func _piles(node: Node3D, b: Building) -> void:
 		holder.add_child(mi)
 
 
-func _smoke(at: Vector3) -> CPUParticles3D:
+func _smoke(at: Vector3, sooty := false) -> CPUParticles3D:
 	var p := CPUParticles3D.new()
 	p.name = "Smoke"
-	p.amount = 8
+	p.amount = 14 if sooty else 8
 	p.lifetime = 3.5
 	p.position = at
 	p.direction = Vector3(0.2, 1, 0)
@@ -587,8 +598,11 @@ func _smoke(at: Vector3) -> CPUParticles3D:
 	curve.add_point(Vector2(1, 1.6))
 	p.scale_amount_curve = curve
 	var grad := Gradient.new()
-	grad.set_color(0, Color(0.8, 0.8, 0.82, 0.55))
-	grad.set_color(1, Color(0.85, 0.85, 0.88, 0.0))
+	grad.set_color(0, Color(0.25, 0.24, 0.24, 0.75) if sooty else Color(0.8, 0.8, 0.82, 0.55))
+	grad.set_color(1, Color(0.45, 0.44, 0.44, 0.0) if sooty else Color(0.85, 0.85, 0.88, 0.0))
+	if sooty:
+		p.scale_amount_min = 0.45
+		p.scale_amount_max = 0.7
 	p.color_ramp = grad
 	var sm := SphereMesh.new()
 	sm.radial_segments = 6

@@ -25,6 +25,19 @@ const RECIPES := {
 	"plaza": [[["TownCenterSecondAgeLevel1", 1.5, 1.5, 2.95, 0]]],
 	"theatre": [[["WonderFirstAgeLevel1", 1.5, 1.45, 2.9, 0]]],
 	"chapel@3": [[["TempleSecondAgeLevel2", 1.5, 1.5, 2.6, 0]]],
+	# industrial revolution: the town turns to brick and slate
+	"house@4": [[["HousesSecondAge3Level3", 1.0, 1.0, 1.95, 0, "brick"]], [["HousesSecondAge1Level3", 1.0, 0.9, 1.75, 0, "brick"]],
+		[["HousesSecondAge2Level2", 1.0, 1.0, 1.95, 0, "brick"]]],
+	"stone_house@4": [[["HousesSecondAge3Level1", 1.0, 0.95, 1.85, 0, "brick"]]],
+	"terrace": [[["HousesSecondAge2Level2", 1.0, 1.0, 1.95, 0, "brick"]], [["HousesSecondAge3Level2", 1.0, 1.0, 1.95, 0, "brick"]]],
+	"coal_mine": [[["Mine", 1.4, 1.2, 2.6, 0], ["CargoTrainCoalContainer", 2.3, 2.5, 1.1, 90], ["RockGroup", 0.6, 2.5, 1.0, 0]]],
+	"brickworks": [[["Building2Small", 1.0, 0.95, 1.9, 0], ["CrateStack1", 1.75, 1.75, 0.45, 0]]],
+	"steelworks": [[["Building3Small", 1.3, 1.3, 2.4, 0], ["CargoTrainCoalContainer", 2.5, 2.5, 0.9, 0]]],
+	"factory": [[["Building3Big", 1.5, 1.4, 2.9, 0]]],
+	"textile_mill": [[["Building4", 1.5, 1.4, 2.9, 0]]],
+	"station": [[["Building1Large", 2.0, 1.0, 3.9, 0], ["RailwayTrackStraight", 2.0, 2.55, 4.0, 0],
+		["LocomotiveFront", 1.3, 2.55, 1.6, 90], ["LocomotiveCoalTender", 2.65, 2.55, 1.1, 90]]],
+	"hospital": [[["Building1Small", 1.5, 1.4, 2.9, 0]]],
 	"windmill": [[["WindmillSecondAge", 1.0, 1.0, 1.95, 0]]],
 	"bakery": [[["HousesSecondAge2Level2", 1.0, 0.95, 1.9, 0], ["Cauldron", 1.75, 1.75, 0.35, 0]]],
 	"orchard": [[["Apple_4", 0.75, 0.75, 1.35, 0], ["Apple_4", 2.25, 0.8, 1.3, 70], ["Apple_4", 0.8, 2.2, 1.25, 140],
@@ -63,11 +76,35 @@ const RECIPES := {
 const PILES := {
 	"logs": ["Logs", 40], "firewood": ["Logs", 60], "stone": ["Rock", 40], "iron": ["Crate", 25],
 	"tools": ["Crate", 25], "coats": ["Bags", 25], "hides": ["Bags", 30], "herbs": ["Bags", 30],
-	"glass": ["Crate", 25], "flour": ["Bags", 30], "bread": ["Crate", 30], "wool": ["Bags", 30], "apples": ["Crate", 30], "mutton": ["Crate", 30],
+	"glass": ["Crate", 25], "flour": ["Bags", 30], "coal": ["RockGroup", 40], "bricks": ["CrateStack1", 40],
+	"steel": ["Crate", 20], "bread": ["Crate", 30], "wool": ["Bags", 30], "apples": ["Crate", 30], "mutton": ["Crate", 30],
 }
 
 static var _cache := {}
 static var _models := {}
+
+
+## A model recoloured for a later era. "brick": pale walls become brick, tiled roofs
+## slate. Parts ask for it with a sixth entry in their recipe.
+static func tinted(name: String, tint: String) -> Mesh:
+	var key := name + "~" + tint
+	if _models.has(key):
+		return _models[key]
+	var arrays := model(name).surface_get_arrays(0)
+	var cols: PackedColorArray = arrays[Mesh.ARRAY_COLOR]
+	for i in cols.size():
+		var c := cols[i]
+		var lum := (c.r + c.g + c.b) / 3.0
+		if tint == "brick":
+			if lum > 0.62 and absf(c.r - c.b) < 0.15:
+				cols[i] = Color(0.6, 0.29, 0.21).darkened(fmod(i * 0.37, 1.0) * 0.08)   # whitewash to brick
+			elif c.r > c.g * 1.4 and c.r > 0.45:
+				cols[i] = Color(0.33, 0.35, 0.4).lightened((c.r - 0.45) * 0.3)           # tiles to slate
+	arrays[Mesh.ARRAY_COLOR] = cols
+	var m := ArrayMesh.new()
+	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	_models[key] = m
+	return m
 
 
 static func model(name: String) -> Mesh:
@@ -104,7 +141,8 @@ static func mesh(type: String, variant := 0, era := 9) -> Mesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for part in vs[variant % vs.size()]:
-		st.append_from(model(part[0]), 0, place(model(part[0]), part[1], part[2], part[3], part[4]))
+		var m: Mesh = tinted(part[0], part[5]) if part.size() > 5 else model(part[0])
+		st.append_from(m, 0, place(m, part[1], part[2], part[3], part[4]))
 	var m := st.commit()
 	_cache[key] = m
 	return m

@@ -88,6 +88,9 @@ const RES := {
 	"flour":     {"name": "Flour", "food": false, "raw": false, "value": 3, "color": Color(0.95, 0.93, 0.85)},
 	"wool":      {"name": "Wool", "food": false, "raw": false, "value": 4, "color": Color(0.92, 0.9, 0.86)},
 	"glass":     {"name": "Glass", "food": false, "raw": false, "value": 8, "color": Color(0.6, 0.85, 0.9)},
+	"coal":      {"name": "Coal", "food": false, "raw": true, "value": 4, "color": Color(0.18, 0.18, 0.2)},
+	"bricks":    {"name": "Bricks", "food": false, "raw": true, "value": 5, "color": Color(0.65, 0.3, 0.22)},
+	"steel":     {"name": "Steel", "food": false, "raw": true, "value": 12, "color": Color(0.6, 0.63, 0.68)},
 }
 const FOODS := ["berries", "mushrooms", "venison", "fish", "wheat", "beans", "apples", "mutton", "bread"]
 const CROPS := ["wheat", "beans"]
@@ -190,6 +193,29 @@ const BUILD := {
 		"desc": "Clean water from the aqueduct: homes nearby are happier and fall ill less."},
 	"theatre": {"name": "Theatre", "kind": "decor", "size": Vector2i(3, 3), "cost": {"logs": 120, "stone": 40},
 		"work": 900, "radius": 20, "happy": 0.3, "cat": "Town", "desc": "Plays and music: a big lift for homes around it."},
+	# industrial revolution ("emit" = climate per month at full staff)
+	"coal_mine": {"name": "Coal mine", "kind": "extract", "size": Vector2i(3, 3), "cost": {"logs": 60, "stone": 40},
+		"work": 700, "workers": 6, "time": 100, "yield": {"coal": 4}, "needs": "mountain", "emit": 0.12,
+		"cat": "Industry", "desc": "Build at the foot of the mountains. Digs coal."},
+	"brickworks": {"name": "Brickworks", "kind": "process", "size": Vector2i(2, 2), "cost": {"logs": 40, "stone": 50},
+		"work": 500, "workers": 3, "input": {"stone": 1, "coal": 1}, "output": {"bricks": 3}, "time": 60, "emit": 0.08,
+		"cat": "Industry", "desc": "Fires bricks with coal."},
+	"steelworks": {"name": "Steelworks", "kind": "process", "size": Vector2i(3, 3), "cost": {"bricks": 80, "stone": 40},
+		"work": 900, "workers": 4, "input": {"iron": 2, "coal": 1}, "output": {"steel": 2}, "time": 90, "emit": 0.2,
+		"cat": "Industry", "desc": "Turns iron and coal into steel."},
+	"factory": {"name": "Steam factory", "kind": "process", "size": Vector2i(3, 3), "cost": {"bricks": 100, "steel": 30},
+		"work": 1000, "workers": 4, "input": {"steel": 1, "logs": 1, "coal": 1}, "output": {"tools": 4}, "time": 60, "emit": 0.18,
+		"cat": "Industry", "desc": "Steam-driven tools by the crate."},
+	"textile_mill": {"name": "Textile mill", "kind": "process", "size": Vector2i(3, 3), "cost": {"bricks": 80, "steel": 10},
+		"work": 900, "workers": 4, "input": {"wool": 1, "coal": 1}, "output": {"coats": 2}, "time": 50, "emit": 0.1,
+		"cat": "Industry", "desc": "Spins and weaves wool into coats by the hundred."},
+	"terrace": {"name": "Brick terrace", "kind": "house", "size": Vector2i(2, 2), "cost": {"bricks": 30, "logs": 10},
+		"work": 500, "residents": 8, "burn": 0.6, "cat": "Housing", "desc": "Brick houses for eight, and warm."},
+	"station": {"name": "Railway station", "kind": "station", "size": Vector2i(4, 3), "cost": {"bricks": 120, "steel": 60, "logs": 40},
+		"work": 1400, "workers": 2, "cat": "Town",
+		"desc": "Trains bring merchants, and new families every spring."},
+	"hospital": {"name": "Hospital", "kind": "hospital", "size": Vector2i(3, 3), "cost": {"bricks": 90, "glass": 20},
+		"work": 1100, "workers": 3, "cat": "Town", "desc": "Doctors: illness is rarer and nearly always cured."},
 	"trading_post": {"name": "Trading post", "kind": "trade", "size": Vector2i(3, 3),
 		"cost": {"logs": 60, "stone": 40, "iron": 10}, "work": 500, "workers": 1, "cat": "Town",
 		"desc": "Merchants visit to barter. Needs a trader."},
@@ -197,7 +223,8 @@ const BUILD := {
 const BUILD_ORDER := ["road", "house", "stone_house", "stockpile", "barn", "gatherer", "hunter", "fisher", "field",
 	"orchard", "pasture", "windmill", "bakery", "forester", "woodcutter", "herbalist", "quarry", "mine", "blacksmith",
 	"tailor", "weaver", "harbour", "glassworks", "well", "chapel", "town_hall", "trading_post", "school", "tavern",
-	"market", "university", "plaza", "theatre"]
+	"market", "university", "plaza", "theatre", "terrace", "coal_mine", "brickworks", "steelworks", "factory",
+	"textile_mill", "station", "hospital"]
 const CATEGORIES := ["Roads", "Housing", "Storage", "Food", "Industry", "Town"]
 
 const FIELD_PLANT_TICKS := 15

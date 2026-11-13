@@ -40,6 +40,10 @@ const LOOKS := {
 	"Market trader": [Color(0.85, 0.55, 0.2), "straw", "basket"],
 	"Glassblower": [Color(0.35, 0.55, 0.6), "", "hammer"],
 	"Scholar": [Color(0.15, 0.12, 0.2), "cap", ""],
+	"Coal miner": [Color(0.22, 0.22, 0.25), "cap", "pick"],
+	"Factory hand": [Color(0.32, 0.36, 0.45), "cap", "hammer"],
+	"Railwayman": [Color(0.15, 0.2, 0.35), "cap", ""],
+	"Doctor": [Color(0.92, 0.93, 0.95), "", ""],
 }
 
 static var _template: Node3D

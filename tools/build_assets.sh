@@ -35,7 +35,10 @@ MedievalVillage/Inn MedievalVillage/Cauldron UltimateCrops/Apple_4 UltimateCrops
 FarmAnimal/Sheep FarmAnimal/Cow
 UltimateFantasyRTS/BarracksSecondAgeLevel1 UltimateFantasyRTS/WatchTowerSecondAgeLevel1 UltimateFantasyRTS/PortSecondAgeLevel1
 UltimateFantasyRTS/TownCenterSecondAgeLevel1 UltimateFantasyRTS/WonderFirstAgeLevel1 UltimateFantasyRTS/TempleSecondAgeLevel2
-UltimateFantasyRTS/HousesSecondAge3Level3"
+UltimateFantasyRTS/HousesSecondAge3Level3
+Buildings/Building1Large Buildings/Building1Small Buildings/Building2Small Buildings/Building3Big Buildings/Building3Small
+Buildings/Building4 ModularTrain/LocomotiveFront ModularTrain/LocomotiveCoalTender ModularTrain/CargoTrainCoalContainer
+ModularTrain/RailwayTrackStraight"
 
 fetch() {   # pack model outdir
   local f="build/usd-src/$1_$2.usda"

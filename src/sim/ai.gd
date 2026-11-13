@@ -746,6 +746,12 @@ static func _plan_work(w: World, c: Citizen, b: Building) -> bool:
 		"market":
 			c.plan = [_go(b.door), _do("idle", 100, "Selling at the market")]
 			return true
+		"station":
+			c.plan = [_go(b.door), _do("idle", 100, "Running the station")]
+			return true
+		"hospital":
+			c.plan = [_go(b.door), _do("idle", 100, "Tending the sick")]
+			return true
 	return false
 
 
@@ -764,7 +770,7 @@ static func _plan_farm(w: World, c: Citizen, b: Building) -> bool:
 		if fx == "":
 			continue
 		b.field_busy[i] = 1
-		var n := Defs.FIELD_HARVEST_TICKS if fx == "harvest" else Defs.FIELD_PLANT_TICKS
+		var n: float = (Defs.FIELD_HARVEST_TICKS if fx == "harvest" else Defs.FIELD_PLANT_TICKS) * w.mod("farm_work")
 		var label := "Harvesting " + b.crop if fx == "harvest" else "Planting " + b.crop
 		c.plan = [_go(w.field_tile(b, i)), _do(fx, n, label, {"b": b.id, "fi": i, "fb": b.id, "work": true})]
 		return true
